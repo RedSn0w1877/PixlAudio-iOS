@@ -1,4 +1,4 @@
-{"fn":"constants","in":{},"out":{"ringSlots":[24,32,40,48,56],"ringFirstSlot":[0,24,56,96,144],"ringRadius":[420,515,610,705,800],"slots":200,"bytes":25,"artRadius":300,"bezelInner":300,"bezelOuter":325,"bigRadius":32,"smallRadius":16,"markerAt":895,"markerRadius":42,"plateCorner":180,"markerArgb":-2537457}}
+{"fn":"constants","in":{},"out":{"ringSlots":[24,32,40,48,56],"ringFirstSlot":[0,24,56,96,144],"ringRadius":[420,515,610,705,800],"slots":200,"bytes":25,"artRadius":280,"bezelInner":305,"bezelOuter":330,"bigRadius":32,"smallRadius":16,"markerAt":895,"markerRadius":42,"plateCorner":180,"markerArgb":-2537457}}
 {"fn":"slot","in":{"slot":0},"out":{"ring":0,"index":0,"count":24,"microTurns":0,"byte":0,"bit":7}}
 {"fn":"slot","in":{"slot":1},"out":{"ring":0,"index":1,"count":24,"microTurns":41666,"byte":0,"bit":6}}
 {"fn":"slot","in":{"slot":2},"out":{"ring":0,"index":2,"count":24,"microTurns":83333,"byte":0,"bit":5}}
