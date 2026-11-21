@@ -1058,3 +1058,16 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 | `data/brain/DnaAssemblerTest` (+1: source 10 is the weakest and is taken out again), the batch jobs | 1 | `AssistantHelpTests` (7: nothing asked while the switch is off or the door is closed, only shortlist ids kept and no second ask, an answer that is not JSON is cached as asked, the switch off takes the claims back, the cache gives nothing while off, the instructions name no vendor, the remote switch) | PixlLibrary | ported | The tag job's claims are checked in `tagInputs`; whether they tip the merged tags is `Tags.merge`'s rule and is unverified (as on Android). |
 | `presentation/components/BrainCopyTest` (+1: Ask Taizo's words and the new settings row) | 1 | `BrainCopyTests.theWordsOfStageFourMilestoneTwoAreAndroidsAndSayNoLearn` | PixlLibrary | ported | Reads `BrainStringsTaizo.swift` as text. |
 | `ClaudeService.complete` (the one short cloud call) | 0 | `ClaudeTests` (`shortCompletionIsOneSmallRequestAndChargesItsUsage`, `shortCompletionReturnsNilForARefusalACutOffAnswerAndNoText`) | PixlNet | added | iOS-only seam for the weekly note and the batch jobs. |
+
+## Endless Listening, milestone E1 (2026-11-21, branch `endless-listening`)
+
+| Android test (class) | Cases | Swift test | Module | Status | Notes |
+|---|---|---|---|---|---|
+| `:brain` `EndlessTest` + golden `endless.jsonl` | 9 + 147 lines | `BrainEndlessTests` (`goldenMatchesAndroid`: 60 `seeds`, 70 `notes`, 9 `fact`, 8 `speakable`; `theEndlessFileIsInTheManifest`; the nine unit cases) | PixlLibrary | ported | The golden file, README and MANIFEST are Android's, copied byte for byte. |
+| `data/brain/EndlessStationTest` | 3 | `BrainEndlessTests` (a source-6 station through a restart, its own id, strings saved before still decode and 7 is refused) + `theRadiosOfEveryIslandSeedAreAsked` | PixlLibrary | ported | The last one stands in for `AutoplayControllerHarnessTest`'s endless case (the controller is `App/`): `StationReseed.seedIds`. |
+| `presentation/components/SetNoteLinesHostTest` | 5 | `Host notes on the queue` (5) | PixlLibrary | ported | |
+| `data/brain/BrainMixesTest` (+2: seeds from the top artists, none for an empty library) | 2 | `Endless Listening seeds` (2) | PixlLibrary | ported | Over the real record files, as `BrainMixesTests`. |
+| `AskTaizoViewModel.HostChip` | 0 | `Ask the host chips` (1) | PixlLibrary | added | Order of the six chips and what each asks of the phone. |
+| `TaizoContext.HOST_ADDENDUM` | 0 | `Host addendum` (1, PixlNet) | PixlNet | added | The addendum follows the cached blocks and names no word the app never says. |
+| (the intro's bars) | 0 | `Endless Listening introduction` (1) | PixlLibrary | added | The five bar heights stay in range and never move together. |
+| `presentation/components/BrainCopyTest` (+1: `strings_endless.xml`) | 1 | `BrainCopyTests.theWordsOfEndlessListeningAreAndroidsAndNameNothingElse` | PixlLibrary | ported | Reads `EndlessStrings.swift` and `EndlessIntroView.swift` as text. |
