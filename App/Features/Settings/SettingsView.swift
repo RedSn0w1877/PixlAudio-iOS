@@ -39,8 +39,6 @@ struct SettingsView: View {
     }
 
     private func open(_ entry: SettingsMainEntry) {
-        // A feature marked broken stays in the list but doesn't open (the row is greyed out as well).
-        if entry.brokenFeature?.isLocked == true { return }
         switch entry {
         case .category(.equalizer): router.push(.equalizer)
         case .category(.deviceCapabilities): router.push(.deviceCapabilities)
@@ -127,14 +125,6 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
 }
 
 extension SettingsMainEntry {
-    /// The feature this row opens when the owner marked it broken (2026-10-26): the row is greyed out and locked.
-    var brokenFeature: BrokenFeature? {
-        switch self {
-        case .category(.equalizer): .equalizer
-        default: nil
-        }
-    }
-
     var title: String {
         switch self {
         case .accounts: L10n.settingsCategoryAccountsTitle
@@ -214,7 +204,7 @@ struct SettingsCategoryRow: View {
                         .pixlFont(.titleMedium, weight: .semibold)
                         .foregroundStyle(theme.onSurface)
                         .lineLimit(1)
-                    Text(entry.brokenFeature?.isLocked == true ? BrokenFeature.label : entry.subtitle)
+                    Text(entry.subtitle)
                         .pixlFont(.bodyMedium)
                         .foregroundStyle(theme.onSurface.opacity(0.65))
                         .lineLimit(2)
@@ -227,9 +217,7 @@ struct SettingsCategoryRow: View {
             .frame(minHeight: 88)
         }
         .buttonStyle(.plain)
-        .disabled(entry.brokenFeature?.isLocked == true)
-        .opacity(entry.brokenFeature?.isLocked == true ? 0.5 : 1)
-        .settingsRowGlass(interactive: entry.brokenFeature?.isLocked != true)
+        .settingsRowGlass(interactive: true)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("settings.\(entry.id)")

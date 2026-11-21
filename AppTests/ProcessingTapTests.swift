@@ -89,7 +89,7 @@ final class ProcessingTapTests: XCTestCase {
         settings.setBandLevel(5, 12)   // 1 kHz +12 dB
         settings.setBandLevel(8, -12)  // 8 kHz −12 dB
         let effects = AudioEffectsParameters()
-        effects.setEqualizer(settings, sampleRate: rate)
+        effects.setEqualizer(settings)
         let designed = EqualizerDesigner.design(settings, sampleRate: rate)
 
         for frequency in [125.0, 1000.0, 8000.0] {
@@ -103,18 +103,44 @@ final class ProcessingTapTests: XCTestCase {
         }
     }
 
-    func testEqualizerAtAnotherSampleRateIsRedesignedForTheTap() async throws {
+    /// A new band setting must reach all prepared taps, including simultaneous decks with different rates.
+    func testLiveBandChangesReachEachPreparedSampleRate() throws {
+        let effects = AudioEffectsParameters()
+        let frequency = 4_000.0
+        let frameCount = 1_024
+        let taps = try [44_100.0, 48_000.0].map { rate in
+            let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1))
+            let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount)))
+            buffer.frameLength = AVAudioFrameCount(frameCount)
+            let tap = TapContext(effects: effects, item: TapItemParameters())
+            tap.prepare(maxFrames: frameCount, format: format.streamDescription.pointee)
+            return (tap, buffer)
+        }
         var settings = EqualizerSettings()
         settings.setEnabled(true)
-        settings.setBandLevel(7, 9)   // 4 kHz +9 dB
-        let effects = AudioEffectsParameters()
-        effects.setEqualizer(settings, sampleRate: 48_000)   // published for 48 kHz, the file is 44.1 kHz
-        let url = try TestAudio.sine(frequency: 4000, seconds: 1.5, amplitude: 0.05)
-        let input = try await render(url)
-        let output = try await render(url, effects: effects)
-        let designed = EqualizerDesigner.design(settings, sampleRate: rate)
-        let expectedDb = EqualizerResponse.magnitudeDb(atFrequency: 4000, sections: designed.sections, sampleRate: rate)
-        XCTAssertEqual(20 * log10(gain(output, input: input)), expectedDb, accuracy: 0.5)
+        for level in [9, -6, 0] {
+            settings.setBandLevel(7, level)
+            effects.setEqualizer(settings)
+            for (tap, buffer) in taps {
+                let channel = try XCTUnwrap(buffer.floatChannelData)[0]
+                let rate = buffer.format.sampleRate
+                var inputPower = 0.0, outputPower = 0.0
+                // Skip the settling interval of vDSP's coefficient glide.
+                for block in 0..<40 {
+                    for frame in 0..<frameCount {
+                        let phase = Double(block * frameCount + frame) * 2 * .pi * frequency / rate
+                        channel[frame] = Float(0.04 * sin(phase))
+                        if block >= 30 { inputPower += Double(channel[frame] * channel[frame]) }
+                    }
+                    tap.process(buffer.mutableAudioBufferList, frames: frameCount, timeRange: .invalid)
+                    if block >= 30 {
+                        for frame in 0..<frameCount { outputPower += Double(channel[frame] * channel[frame]) }
+                    }
+                }
+                XCTAssertEqual(10 * log10(outputPower / inputPower), Double(level), accuracy: 0.5,
+                               "Live change to \(level) dB on \(rate) Hz audio")
+            }
+        }
     }
 
     func testBassBoostShelf() async throws {
@@ -122,7 +148,7 @@ final class ProcessingTapTests: XCTestCase {
         settings.setBassBoostEnabled(true)
         settings.setBassBoostStrength(1000)   // +15 dB shelf at 90 Hz
         let effects = AudioEffectsParameters()
-        effects.setEqualizer(settings, sampleRate: rate)
+        effects.setEqualizer(settings)
         let url = try TestAudio.sine(frequency: 40, seconds: 2, amplitude: 0.03)
         let input = try await render(url)
         let output = try await render(url, effects: effects)
@@ -216,7 +242,7 @@ final class ProcessingTapTests: XCTestCase {
         settings.setVirtualizerEnabled(true)
         settings.setVirtualizerStrength(1000)   // width 1.8
         let effects = AudioEffectsParameters()
-        effects.setEqualizer(settings, sampleRate: rate)
+        effects.setEqualizer(settings)
         let url = try TestAudio.noise(seconds: 1, amplitude: 0.1)
         let input = try await render(url)
         let output = try await render(url, effects: effects)

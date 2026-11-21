@@ -16,7 +16,7 @@ struct LyricsMoreActions {
 }
 
 /// The lyrics More sheet (Android `LyricsMoreBottomSheet`): Lyrics actions, Appearance (alignment), Controls
-/// (Adjust sync, locked as broken for now; romanisation, translations, immersive once) and the shuffle / repeat /
+/// (Adjust sync, romanisation, translations, immersive once) and the shuffle / repeat /
 /// favourite row. "Translate on device" and "Show as plain text" are gone (owner, 2026-10-26). The lyrics screen
 /// presents it at half height, where iOS draws the sheet as floating Liquid Glass (owner,
 /// 2026-10-07: "0 liquid glass"); its rows stay soft fills on that glass (no glass on glass), while the alignment
@@ -160,11 +160,8 @@ struct LyricsMoreSheet: View {
                 caption("Controls")
                 rowGroup(bottomRadius: 24) {
                     if syncVisible, let toggle = actions.onToggleSyncControls {
-                        // Locked while it is broken (owner, 2026-10-26): greyed out, marked, and it does nothing.
-                        let locked = BrokenFeature.lyricsAdjustSync.isLocked
-                        row(isSyncControlsVisible && !locked ? "Hide sync controls" : "Adjust sync",
-                            subtitle: locked ? LocalizedStringKey(BrokenFeature.label) : nil,
-                            systemImage: "slider.horizontal.3", isLocked: locked, identifier: "lyricsMore.adjustSync") {
+                        row(isSyncControlsVisible ? "Hide sync controls" : "Adjust sync",
+                            systemImage: "slider.horizontal.3", identifier: "lyricsMore.adjustSync") {
                             dismiss()
                             toggle()
                         }
@@ -223,7 +220,7 @@ struct LyricsMoreSheet: View {
     /// fragile.
     @ViewBuilder
     private func row(_ title: LocalizedStringKey, subtitle: LocalizedStringKey? = nil, systemImage: String,
-                     accent: Bool = false, isLocked: Bool = false, identifier: String? = nil,
+                     accent: Bool = false, identifier: String? = nil,
                      action: @escaping () -> Void) -> some View {
         let button = Button(action: action) {
             HStack(spacing: 16) {
@@ -250,9 +247,6 @@ struct LyricsMoreSheet: View {
             .contentShape(rowShape)
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.98))
-        // A locked row (a feature marked broken) stays visible, greyed out, and takes no taps.
-        .disabled(isLocked)
-        .opacity(isLocked ? 0.5 : 1)
         if let identifier {
             button.accessibilityIdentifier(identifier)
         } else {

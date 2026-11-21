@@ -101,9 +101,7 @@ nonisolated final class TapContext: @unchecked Sendable {
     // documented order (section → coefficient → channel) produced unstable filters on CI.
     private let biquads: UnsafeMutablePointer<vDSP_biquadm_Setup?>
     private var biquadChannels = 0
-    private var loadedGeneration = -1
-    /// Mono block redesigned for this tap's sample rate when it differs from the published design rate.
-    private let localBlock: UnsafeMutablePointer<Double>
+    private var coefficients: TapEqualizerCoefficients?
     private var preGain: Float = 1
     private var currentPreGain: Float = 1
     private var width: Float = 1
@@ -147,8 +145,6 @@ nonisolated final class TapContext: @unchecked Sendable {
         channelStarts.initialize(repeating: dummy, count: Self.maxChannels)
         biquads = .allocate(capacity: Self.maxChannels)
         biquads.initialize(repeating: nil, count: Self.maxChannels)
-        localBlock = .allocate(capacity: AudioEffectsParameters.blockSize)
-        localBlock.initialize(repeating: 0, count: AudioEffectsParameters.blockSize)
     }
 
     deinit {
@@ -157,7 +153,6 @@ nonisolated final class TapContext: @unchecked Sendable {
         inputPointers.deallocate()
         outputPointers.deallocate()
         channelStarts.deallocate()
-        localBlock.deallocate()
         dummy.deallocate()
     }
 
@@ -183,7 +178,7 @@ nonisolated final class TapContext: @unchecked Sendable {
 
     func unprepare() {
         destroyBiquads()
-        loadedGeneration = -1
+        coefficients = nil
     }
 
     private func destroyBiquads() {
@@ -197,9 +192,11 @@ nonisolated final class TapContext: @unchecked Sendable {
     /// (Re)creates one single-channel setup per channel from the latest coefficients.
     private func rebuildBiquad() {
         destroyBiquads()
+        coefficients = nil
         guard channels > 0, isFloat32 else { return }
-        let latest = effects.latestBlock()
-        let block = blockForThisRate(latest.block)
+        let prepared = effects.coefficients(for: sampleRate)
+        coefficients = prepared
+        guard let block = prepared.takeUpdate() else { return }
         var created = 0
         for c in 0..<channels {
             guard let setup = vDSP_biquadm_CreateSetup(block, vDSP_Length(AudioEffectsParameters.sectionCount), 1)
@@ -210,18 +207,6 @@ nonisolated final class TapContext: @unchecked Sendable {
         if created == channels { biquadChannels = channels } else { destroyBiquads() }
         loadTail(block)
         currentPreGain = preGain
-        loadedGeneration = latest.generation
-    }
-
-    /// The published block, or one redesigned for this tap's rate when it differs from the design rate. Designing
-    /// allocates, so this only runs in `prepare` — buffers between a settings change and the next prepare use the
-    /// published coefficients (a fraction of a semitone off at worst for 48 kHz content).
-    private func blockForThisRate(_ published: UnsafePointer<Double>) -> UnsafePointer<Double> {
-        let designRate = effects.designSampleRate.load()
-        guard abs(designRate - sampleRate) > 0.5 else { return published }
-        let parameters = EqualizerDesigner.design(effects.settings, sampleRate: sampleRate)
-        AudioEffectsParameters.write(parameters, into: localBlock)
-        return UnsafePointer(localBlock)
     }
 
     @inline(__always)
@@ -331,20 +316,14 @@ nonisolated final class TapContext: @unchecked Sendable {
         if replayGain > SoftLimiter.defaultThreshold && replayGain > 1 { limit(frames: frames) }
 
         // 2. Equalizer chain: loudness pre-gain, band + bass-boost biquads, width, limiter.
-        let latest = effects.latestBlock()
-        if latest.generation != loadedGeneration {
-            loadedGeneration = latest.generation
-            let designRate = effects.designSampleRate.load()
-            // A different rate keeps the coefficients designed in prepare (see blockForThisRate).
-            if abs(designRate - sampleRate) <= 0.5 {
-                for c in 0..<biquadChannels {
-                    if let setup = biquads[c] {
-                        vDSP_biquadm_SetTargetsDouble(setup, latest.block, 0.25, 1e-6, 0, 0,
-                                                      vDSP_Length(AudioEffectsParameters.sectionCount), 1)
-                    }
+        if let block = coefficients?.takeUpdate() {
+            for c in 0..<biquadChannels {
+                if let setup = biquads[c] {
+                    vDSP_biquadm_SetTargetsDouble(setup, block, 0.25, 1e-6, 0, 0,
+                                                  vDSP_Length(AudioEffectsParameters.sectionCount), 1)
                 }
             }
-            loadTail(latest.block)
+            loadTail(block)
         }
         if !bypass || tailFrames > 0 || currentPreGain != preGain {
             applyGainRamp(from: currentPreGain, to: preGain, frames: frames)

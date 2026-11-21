@@ -131,7 +131,21 @@ final class SettingsFeatureTests: XCTestCase {
         XCTAssertEqual(model.prefs.presetName, "flat")
     }
 
-    func testTabsArePinnedBuiltInsThenCustom() {
+    func testLegacyCustomPresetsAreEditableAndSafeToDisplay() throws {
+        let prefs = EqualizerPreferences(defaults: freshDefaults())
+        let presets = [EqualizerPreset(name: "rock", displayName: "Rock", bandLevels: [20]),
+                       EqualizerPreset(name: "Mine", displayName: "Mine", bandLevels: Array(repeating: -20, count: 12))]
+        prefs.customPresetsJSON = String(decoding: try JSONEncoder().encode(presets), as: UTF8.self)
+        let model = EqualizerModel(prefs: prefs)
+        XCTAssertEqual(model.customPresets.map(\.name), ["rock (saved)", "Mine"])
+        XCTAssertEqual(model.customPresets[0].bandLevels, [15] + Array(repeating: 0, count: 9))
+        XCTAssertFalse(model.canNamePreset("rock"))
+        XCTAssertFalse(model.canNamePreset(" Mine "))
+        model.select(model.customPresets[1])
+        XCTAssertEqual(prefs.engineSettings.bandLevels, Array(repeating: -15, count: 10))
+    }
+
+    func testTabsArePinnedPresetsThenCustom() {
         let model = EqualizerModel(prefs: EqualizerPreferences(defaults: freshDefaults()))
         model.setPinnedOrder(["pop", "rock"])
         XCTAssertEqual(model.tabPresets.map(\.name), ["pop", "rock", "custom"])
@@ -139,31 +153,31 @@ final class SettingsFeatureTests: XCTestCase {
         XCTAssertEqual(model.tabPresets.count, EqualizerPreset.allPresets.count + 1)
     }
 
-    /// The equalizer is marked broken (owner, 2026-10-26): the engine gets everything off whatever the preferences say,
-    /// and a store that finds effects stored on switches them off.
-    func testEqualizerIsLockedOffWhileItIsBroken() {
+    func testEqualizerRestoresPreferencesAndAppliesLiveEdits() {
         let defaults = freshDefaults()
-        defaults.set(true, forKey: PreferenceKeys.equalizerEnabled)
-        defaults.set(true, forKey: PreferenceKeys.bassBoostEnabled)
-        defaults.set(true, forKey: PreferenceKeys.virtualizerEnabled)
-        defaults.set(true, forKey: PreferenceKeys.loudnessEnhancerEnabled)
         let prefs = EqualizerPreferences(defaults: defaults)
-        XCTAssertFalse(prefs.isEnabled || prefs.bassBoostEnabled || prefs.virtualizerEnabled || prefs.loudnessEnhancerEnabled)
-        XCTAssertFalse(defaults.bool(forKey: PreferenceKeys.equalizerEnabled))
-        XCTAssertFalse(defaults.bool(forKey: PreferenceKeys.virtualizerEnabled))
-        // Even switched on afterwards (a restored backup), the engine stays flat.
         let model = EqualizerModel(prefs: prefs)
-        model.toggleEnabled()
-        model.select(.bassBoost)
+        model.select(.rock)
+        prefs.isEnabled = true
+        prefs.bassBoostEnabled = true
+        prefs.bassBoostStrength = 750
         prefs.virtualizerEnabled = true
         prefs.virtualizerStrength = 500
-        XCTAssertFalse(prefs.engineSettings.hasAnyEnabledEffects)
-        XCTAssertEqual(prefs.engineSettings.bandLevels, EqualizerSettings().bandLevels)
-        // The Settings list keeps the row, marked, and it does not open.
-        let row = SettingsMainEntry.category(.equalizer)
-        XCTAssertEqual(row.brokenFeature, .equalizer)
-        XCTAssertNil(SettingsMainEntry.category(.lyrics).brokenFeature)
-        XCTAssertNil(SettingsMainEntry.accounts.brokenFeature)
+        prefs.loudnessEnhancerEnabled = true
+        prefs.loudnessEnhancerStrength = 250
+
+        let restored = EqualizerPreferences(defaults: defaults).engineSettings
+        XCTAssertTrue(restored.isEnabled && restored.bassBoostEnabled && restored.virtualizerEnabled && restored.loudnessEnhancerEnabled)
+        XCTAssertEqual(restored.bandLevels, EqualizerPreset.rock.bandLevels)
+        XCTAssertEqual([restored.bassBoostStrength, restored.virtualizerStrength, restored.loudnessEnhancerStrength], [750, 500, 250])
+        prefs.isEnabled = false
+        model.setBandLevel(0, -5)
+        XCTAssertFalse(prefs.engineSettings.isEnabled)
+        XCTAssertTrue(prefs.engineSettings.bassBoostEnabled)
+        model.saveCurrentAsCustomPreset("Evening")
+        XCTAssertTrue(model.tabPresets.contains { $0.name == "Evening" })
+        prefs.isEnabled = true
+        XCTAssertEqual(prefs.engineSettings.bandLevels[0], -5)
     }
 
     /// Smart features start on and nothing in a fresh store or in setup turns them off (owner, 2026-10-26).

@@ -17,28 +17,26 @@ final class EqualizerModel {
 
     // MARK: Derived state (Android `EqualizerUiState`)
 
-    var customPresets: [EqualizerPreset] {
-        guard let json = prefs.customPresetsJSON, let data = json.data(using: .utf8),
-              let presets = try? JSONDecoder().decode([EqualizerPreset].self, from: data) else { return [] }
-        return presets
-    }
+    var customPresets: [EqualizerPreset] { prefs.savedPresets }
+
+    @ObservationIgnored private var decodedPinsJSON: String?
+    @ObservationIgnored private var decodedPins: [String] = []
 
     var pinnedNames: [String] {
-        guard let json = prefs.pinnedPresetsJSON, let data = json.data(using: .utf8),
-              let names = try? JSONDecoder().decode([String].self, from: data) else {
-            return EqualizerPreset.allPresets.map(\.name)
+        guard let json = prefs.pinnedPresetsJSON else { return EqualizerPreset.allPresets.map(\.name) }
+        if json != decodedPinsJSON {
+            let names = (try? JSONDecoder().decode([String].self, from: Data(json.utf8))) ?? EqualizerPreset.allPresets.map(\.name)
+            var seen: Set<String> = []
+            decodedPins = names.filter { $0 != "custom" && seen.insert($0).inserted }
+            decodedPinsJSON = json
         }
-        return names
+        return decodedPins
     }
 
-    var currentPreset: EqualizerPreset {
-        if prefs.presetName == "custom" { return .custom(bandLevels: prefs.customBands) }
-        return customPresets.first { $0.name == prefs.presetName } ?? .fromName(prefs.presetName)
-    }
+    var currentPreset: EqualizerPreset { prefs.selectedPreset }
 
     var bandLevels: [Int] {
-        let preset = currentPreset
-        return preset.name == "custom" ? prefs.customBands : preset.bandLevels
+        currentPreset.bandLevels
     }
 
     /// Pinned presets resolved to presets (custom first, then built-in) — Android `accessiblePresets`.
@@ -49,9 +47,9 @@ final class EqualizerModel {
         }
     }
 
-    /// The tabs: pinned built-in presets, then the "Custom" tab (Android `visiblePresets`).
+    /// Pinned presets in the order chosen in Manage presets, followed by the editable custom curve.
     var tabPresets: [EqualizerPreset] {
-        accessiblePresets.filter { !$0.isCustom } + [.custom(bandLevels: Array(repeating: 0, count: 10))]
+        accessiblePresets + [.custom(bandLevels: Array(repeating: 0, count: 10))]
     }
 
     var allAvailablePresets: [EqualizerPreset] { EqualizerPreset.allPresets + customPresets }
@@ -59,12 +57,6 @@ final class EqualizerModel {
     var viewMode: EqualizerViewMode { EqualizerViewMode(rawValue: prefs.viewMode) ?? .sliders }
 
     // MARK: Actions
-
-    func cycleViewMode() {
-        prefs.viewMode = viewMode.next.rawValue
-    }
-
-    func toggleEnabled() { prefs.isEnabled.toggle() }
 
     func select(_ preset: EqualizerPreset) {
         editingPresetName = nil
@@ -85,13 +77,19 @@ final class EqualizerModel {
         if prefs.presetName != "custom" { prefs.presetName = "custom" }
     }
 
-    func saveCurrentAsCustomPreset(_ name: String) {
+    func canNamePreset(_ draft: String) -> Bool {
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !name.isEmpty && name != "custom" && !allAvailablePresets.contains { $0.name == name }
+    }
+
+    func saveCurrentAsCustomPreset(_ draft: String) {
+        guard canNamePreset(draft) else { return }
+        let name = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let preset = EqualizerPreset(name: name, displayName: name, bandLevels: prefs.customBands, isCustom: true)
         var presets = customPresets
-        presets.removeAll { $0.name == name }
         presets.append(preset)
         writePresets(presets)
-        togglePin(name)
+        if !pinnedNames.contains(name) { togglePin(name) }
         select(preset)
     }
 
@@ -105,11 +103,12 @@ final class EqualizerModel {
             writePinned(pinned)
         }
         if wasCurrent { select(.flat) }
+        if editingPresetName == preset.name { editingPresetName = nil }
     }
 
     func renameCustomPreset(_ oldName: String, to newName: String) {
-        let trimmed = newName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, trimmed != oldName else { return }
+        guard canNamePreset(newName) else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         var presets = customPresets
         guard let index = presets.firstIndex(where: { $0.name == oldName }) else { return }
         presets[index].name = trimmed
@@ -121,6 +120,7 @@ final class EqualizerModel {
             writePinned(pinned)
         }
         if prefs.presetName == oldName { prefs.presetName = trimmed }
+        if editingPresetName == oldName { editingPresetName = trimmed }
     }
 
     func updateCustomPresetBands(_ name: String) {
@@ -156,38 +156,27 @@ nonisolated enum EqualizerViewMode: String, Sendable, CaseIterable {
     case graph = "GRAPH"
     case hybrid = "HYBRID"
 
-    var next: EqualizerViewMode {
+    var title: String {
         switch self {
-        case .sliders: .graph
-        case .graph: .hybrid
-        case .hybrid: .sliders
-        }
-    }
-
-    /// SF Symbols for Android's GraphicEq / ShowChart / ViewQuilt.
-    var systemImage: String {
-        switch self {
-        case .sliders: "slider.vertical.3"
-        case .graph: "chart.xyaxis.line"
-        case .hybrid: "rectangle.split.2x1"
+        case .sliders: String(localized: "Sliders")
+        case .graph: String(localized: "Graph")
+        case .hybrid: String(localized: "Hybrid")
         }
     }
 }
 
 extension EqualizerPreferences {
+    fileprivate var selectedPreset: EqualizerPreset {
+        if presetName == "custom" { return .custom(bandLevels: customBands) }
+        return savedPresets.first { $0.name == presetName } ?? .fromName(presetName)
+    }
+
     /// The settings the audio engine applies (PixlAudioCore `EqualizerSettings`), from the stored preferences.
     var engineSettings: EqualizerSettings {
-        // Locked while the equalizer is marked broken (owner, 2026-10-26): the engine always gets everything off.
-        if BrokenFeature.equalizer.isLocked { return EqualizerSettings() }
         var settings = EqualizerSettings()
         // Built-in presets restore by name; "custom" and saved custom presets apply their band levels.
-        let isBuiltIn = EqualizerPreset.allPresets.contains { $0.name == presetName }
-        var bands = customBands
-        if !isBuiltIn, presetName != "custom", let json = customPresetsJSON, let data = json.data(using: .utf8),
-           let saved = (try? JSONDecoder().decode([EqualizerPreset].self, from: data))?.first(where: { $0.name == presetName }) {
-            bands = saved.bandLevels
-        }
-        settings.restore(enabled: isEnabled, presetName: isBuiltIn ? presetName : "custom", customBands: bands,
+        let preset = selectedPreset
+        settings.restore(enabled: isEnabled, presetName: preset.isCustom ? "custom" : preset.name, customBands: preset.bandLevels,
                          bassBoostEnabled: bassBoostEnabled, bassBoostStrength: bassBoostStrength,
                          virtualizerEnabled: virtualizerEnabled, virtualizerStrength: virtualizerStrength,
                          loudnessEnabled: loudnessEnhancerEnabled, loudnessStrength: loudnessEnhancerStrength)

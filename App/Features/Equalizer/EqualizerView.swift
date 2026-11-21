@@ -5,106 +5,52 @@ import PixlModel
 import SwiftUI
 import UIKit
 
-/// Equalizer (Android `EqualizerScreen`): the collapsing "Equalizer" header with the view-mode and power circles,
-/// the preset tabs (pinned built-in presets, "Custom", and the "Edit" tab), the band card (preset chip + save /
-/// update chips over the sliders, the graph or the hybrid view), the three effect cards (bass boost, virtualizer,
-/// loudness — the loudness gain is the chain's preamp) and the volume card. Rows 6 pt apart.
-///
-/// iOS: every effect is our own DSP (PixlAudioCore), so the "not supported on this device" cards never show; the
-/// volume card hosts the system volume slider (`MPVolumeView` — apps can't set the system volume themselves).
+/// Ten editable frequency bands, independent audio effects and the volume of the current output.
 struct EqualizerView: View {
     var screenID = "equalizer"
 
     @Environment(SettingsStore.self) private var settings
-    @State private var model: EqualizerModel?
 
     var body: some View {
-        Group {
-            if let model {
-                EqualizerContent(model: model, screenID: screenID)
-            } else {
-                Color.clear
-            }
-        }
-        .onAppear { if model == nil { model = EqualizerModel(prefs: settings.equalizer) } }
+        EqualizerContent(prefs: settings.equalizer, screenID: screenID)
     }
 }
 
 private struct EqualizerContent: View {
-    let model: EqualizerModel
+    @State private var model: EqualizerModel
     let screenID: String
 
     @State private var showsCustomPresets = false
     @State private var showsReorder = false
     @State private var showsSave = false
-    @State private var renameTarget: EqualizerPreset?
     @State private var nameDraft = ""
-    @State private var appeared = false
-    @Environment(\.appTheme) private var theme
-    private let locked = BrokenFeature.equalizer.isLocked
+
+    init(prefs: EqualizerPreferences, screenID: String) {
+        _model = State(initialValue: EqualizerModel(prefs: prefs))
+        self.screenID = screenID
+    }
 
     var body: some View {
-        let prefs = model.prefs
-        SettingsScaffold(title: L10n.settingsCategoryEqualizerTitle, screenID: screenID, collapsedTitleLeading: 72,
-                         horizontalPadding: 0, spacing: 6) {
-            GlassCircleButton(systemImage: model.viewMode.systemImage,
-                              accessibilityLabel: LocalizedStringKey(L10n.equalizerChangeViewModeCd),
-                              tint: theme.surfaceContainerLow.opacity(GlassTint.surface)) {
-                withAnimation(PixlMotion.state) { model.cycleViewMode() }
-            }
-            .accessibilityIdentifier("eq.viewMode")
-            .disabled(locked)
-            .opacity(locked ? 0.5 : 1)
-            Spacer().frame(width: 12)
-            // Android's power toggle: a filled `primary` circle when on, a 12 % rounded square when off.
-            EqualizerPowerButton(isOn: prefs.isEnabled) { withAnimation(PixlMotion.selection) { model.toggleEnabled() } }
-                .disabled(locked)
-                .opacity(locked ? 0.5 : 1)
-            Spacer().frame(width: 12)
-        } content: {
-            // Locked while it is broken (owner, 2026-10-26): greyed out and marked, every effect stays off.
-            if locked { EqualizerBrokenBanner() }
-            Group {
-                PresetTabsRow(model: model) { showsReorder = true }
-                EqualizerBandCard(model: model,
-                                  onSave: { nameDraft = ""; showsSave = true },
-                                  onUpdate: { if let name = model.editingPresetName { model.updateCustomPresetBands(name) } },
-                                  onPresetsList: { showsCustomPresets = true })
-                EqualizerEffectsRow(prefs: prefs)
-            }
-            .disabled(locked)
-            .opacity(locked ? 0.5 : 1)
+        SettingsScaffold(title: L10n.settingsCategoryEqualizerTitle, screenID: screenID,
+                         horizontalPadding: 0, spacing: 12) {
+            PresetTabsRow(model: model) { showsReorder = true }
+            EqualizerBandCard(model: model,
+                              onSave: { nameDraft = ""; showsSave = true },
+                              onUpdate: { if let name = model.editingPresetName { model.updateCustomPresetBands(name) } },
+                              onPresetsList: { showsCustomPresets = true })
+            EqualizerEffects(prefs: model.prefs)
             EqualizerVolumeCard()
-            Spacer().frame(height: 4)
         }
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 40)
-        .onAppear { withAnimation(.easeOut(duration: 0.4)) { appeared = true } }
         .alert(L10n.equalizerPresetsSaveCustomTitle, isPresented: $showsSave) {
             TextField(L10n.equalizerPresetNamePlaceholder, text: $nameDraft)
             Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.commonSave) {
-                let name = nameDraft.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty { model.saveCurrentAsCustomPreset(name) }
-            }
-            .disabled(nameDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button(L10n.commonSave) { model.saveCurrentAsCustomPreset(nameDraft) }
+            .disabled(!model.canNamePreset(nameDraft))
         } message: {
             Text(L10n.equalizerPresetsSaveCustomBody)
         }
-        .alert(L10n.equalizerPresetsRenameTitle, isPresented: Binding(
-            get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
-            TextField(L10n.equalizerPresetNamePlaceholder, text: $nameDraft)
-            Button(L10n.commonCancel, role: .cancel) {}
-            Button(L10n.equalizerActionRename) {
-                if let target = renameTarget { model.renameCustomPreset(target.name, to: nameDraft) }
-            }
-            .disabled(nameDraft.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
         .sheet(isPresented: $showsCustomPresets) {
-            CustomPresetsSheet(model: model) { preset in
-                nameDraft = preset.displayName
-                renameTarget = preset
-            }
+            CustomPresetsSheet(model: model)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
@@ -114,80 +60,25 @@ private struct EqualizerContent: View {
     }
 }
 
-/// "Broken, fix soon" (owner, 2026-10-26): the note above the greyed-out equalizer.
-private struct EqualizerBrokenBanner: View {
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(theme.onErrorContainer)
-            Text(BrokenFeature.label)
-                .pixlFont(.titleSmall, weight: .semibold)
-                .foregroundStyle(theme.onErrorContainer)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous),
-                   tint: theme.errorContainer.opacity(GlassTint.container))
-        .padding(.horizontal, 16)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("eq.broken")
-    }
-}
-
-/// Android's `FilledIconToggleButton` power button: corners animate from 12 % (off) to a circle (on); on = `primary`.
-private struct EqualizerPowerButton: View {
-    let isOn: Bool
-    let action: () -> Void
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: isOn ? 20 : 40 * 0.12, style: .continuous)
-        Button(action: action) {
-            Image(systemName: "power")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(isOn ? theme.onPrimary : theme.onSurface)
-                .frame(width: 40, height: 40)
-                .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .pixlGlass(in: shape, tint: isOn ? theme.primary.opacity(GlassTint.prominent)
-                                         : theme.surfaceContainerLow.opacity(GlassTint.surface), interactive: true)
-        .accessibilityLabel(isOn ? L10n.equalizerDisableCd : L10n.equalizerEnableCd)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
-        .accessibilityIdentifier("eq.power")
-        .pixlHaptic(.impact(weight: .medium), trigger: isOn)
-    }
-}
-
-/// Android `PresetTabsRow`: a scrollable row of capsules (pinned built-in presets, then "Custom" with a star) and an
-/// unselectable "Edit" capsule that opens Manage presets.
 private struct PresetTabsRow: View {
     let model: EqualizerModel
     let onEdit: () -> Void
 
     var body: some View {
         let presets = model.tabPresets
-        let current = model.currentPreset
-        let selected = (current.isCustom || current.name == "custom") ? "custom"
-            : (presets.first { $0.name == current.name }?.name ?? presets.first?.name ?? "flat")
+        let selected = model.currentPreset.name
         GlassPillRow(items: presets.map { GlassPillRow<String>.Item(id: $0.name, title: $0.displayName,
                                                                     systemImage: $0.isCustom ? "star.fill" : nil) },
                      selection: Binding(get: { selected }, set: { name in
                          if let preset = presets.first(where: { $0.name == name }) { model.select(preset) }
                      }),
-                     uppercase: false, edgePadding: 12, accessibilityIdentifierPrefix: "eq.preset",
+                     uppercase: false, edgePadding: 16, accessibilityIdentifierPrefix: "eq.preset",
                      accessory: .init(systemImage: "pencil", accessibilityLabel: L10n.equalizerEditPresetsCd,
                                      action: onEdit))
             .frame(height: 56)
     }
 }
 
-/// Android `BandSlidersSection`: a 24 pt card (here glass) with the preset chips and the sliders for the view mode.
 private struct EqualizerBandCard: View {
     let model: EqualizerModel
     let onSave: () -> Void
@@ -200,95 +91,110 @@ private struct EqualizerBandCard: View {
     var body: some View {
         let prefs = model.prefs
         let levels = model.bandLevels
-        let enabled = prefs.isEnabled
-        VStack(spacing: 0) {
-            chips
-            Spacer().frame(height: 10)
-            switch model.viewMode {
-            case .graph:
-                EqualizerGraphSliders(levels: levels, enabled: enabled) { model.setBandLevel($0, $1) }
-            case .hybrid:
-                EqualizerHybridSliders(levels: levels, enabled: enabled, settings: prefs.engineSettings) {
-                    model.setBandLevel($0, $1)
-                }
-            case .sliders:
-                TabView(selection: $page) {
-                    ForEach(0..<2, id: \.self) { pageIndex in
-                        HStack(spacing: 0) {
-                            ForEach(pageIndex * 5..<min(pageIndex * 5 + 5, levels.count), id: \.self) { index in
-                                Spacer(minLength: 0)
-                                EqualizerBandColumn(frequency: EqualizerPreset.bandFrequencies[index],
-                                                    level: levels[index], enabled: enabled) {
-                                    model.setBandLevel(index, $0)
-                                }
-                                Spacer(minLength: 0)
-                            }
-                        }
-                        .tag(pageIndex)
+        GlassCard(cornerRadius: 24, tint: theme.surfaceContainerLow) {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: Binding(get: { prefs.isEnabled }, set: { prefs.isEnabled = $0 })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.equalizerFrequencyResponse)
+                            .pixlFont(.titleMedium, weight: .semibold)
+                            .foregroundStyle(theme.onSurface)
+                        Text(model.editingPresetName ?? model.currentPreset.displayName)
+                            .pixlFont(.bodySmall)
+                            .foregroundStyle(theme.onSurfaceVariant)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 270)
-                Spacer().frame(height: 16)
-                HStack(spacing: 0) {
-                    ForEach(0..<2, id: \.self) { index in
-                        Circle()
-                            .fill(page == index ? theme.primary : theme.surfaceContainerHighest)
-                            .frame(width: page == index ? 10 : 8, height: page == index ? 10 : 8)
-                            .padding(4)
+                .accessibilityLabel(L10n.settingsCategoryEqualizerTitle)
+                .accessibilityIdentifier("eq.power")
+                .tint(theme.primary)
+                .padding(.horizontal, 16)
+
+                Picker(L10n.equalizerChangeViewModeCd, selection: Binding(get: { model.viewMode },
+                       set: { prefs.viewMode = $0.rawValue })) {
+                    ForEach(EqualizerViewMode.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
                     }
                 }
-                .animation(PixlMotion.selection, value: page)
-                .accessibilityElement()
-                .accessibilityLabel(L10n.equalizerPageN(page + 1))
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .accessibilityIdentifier("eq.viewMode")
+
+                bandEditor(levels)
+                presetActions
             }
+            .padding(.vertical, 16)
         }
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                   tint: theme.surfaceContainerLow.opacity(SettingsTint.row))
         .padding(.horizontal, 16)
     }
 
-    private var chips: some View {
-        let current = model.currentPreset
-        let editing = model.editingPresetName
-        let isCustomOrSaved = editing != nil || current.name == "custom" || current.isCustom
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button(action: onPresetsList) {
-                    HStack(spacing: 8) {
-                        Text(editing ?? current.displayName)
-                            .pixlFont(.labelLarge, weight: .bold)
-                        if isCustomOrSaved {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 14, weight: .bold))
-                                .accessibilityLabel(L10n.equalizerPresetsCd)
+    @ViewBuilder
+    private func bandEditor(_ levels: [Int]) -> some View {
+        switch model.viewMode {
+        case .graph:
+            EqualizerGraphSliders(levels: levels) { model.setBandLevel($0, $1) }
+        case .hybrid:
+            EqualizerHybridSliders(levels: levels) {
+                model.setBandLevel($0, $1)
+            }
+        case .sliders:
+            TabView(selection: $page) {
+                ForEach(0..<2, id: \.self) { pageIndex in
+                    HStack(spacing: 0) {
+                        ForEach(pageIndex * 5..<min(pageIndex * 5 + 5, levels.count), id: \.self) { index in
+                            Spacer(minLength: 0)
+                            EqualizerBandColumn(frequency: EqualizerPreset.bandFrequencies[index],
+                                                level: levels[index]) {
+                                model.setBandLevel(index, $0)
+                            }
+                            Spacer(minLength: 0)
                         }
                     }
-                    .foregroundStyle(theme.onSecondaryContainer)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(theme.secondaryContainer, in: Capsule())
+                    .tag(pageIndex)
                 }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-                .disabled(!isCustomOrSaved)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 270)
+
+            HStack(spacing: 0) {
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .fill(page == index ? theme.primary : theme.surfaceContainerHighest)
+                        .frame(width: page == index ? 10 : 8, height: page == index ? 10 : 8)
+                        .padding(4)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .animation(PixlMotion.selection, value: page)
+            .accessibilityElement()
+            .accessibilityLabel(L10n.equalizerPageN(page + 1))
+        }
+    }
+
+    private var presetActions: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Button(action: onPresetsList) {
+                    Label(L10n.equalizerPresetsSavedTitle, systemImage: "list.bullet")
+                        .pixlFont(.labelLarge)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .foregroundStyle(theme.onSecondaryContainer)
+                        .background(theme.secondaryContainer, in: Capsule())
+                }
+                .buttonStyle(PressScaleButtonStyle())
                 .accessibilityIdentifier("eq.presetChip")
-                if current.name == "custom" && editing == nil {
-                    chip(L10n.commonSave, fill: theme.tertiaryContainer, content: theme.onTertiaryContainer,
-                         id: "eq.save", action: onSave)
-                }
-                if editing != nil {
+                if model.editingPresetName != nil {
                     chip(L10n.equalizerActionUpdate, fill: theme.primaryContainer, content: theme.onPrimaryContainer,
                          id: "eq.update", action: onUpdate)
                     chip(L10n.equalizerActionSaveNew, fill: theme.tertiaryContainer, content: theme.onTertiaryContainer,
                          id: "eq.saveNew", action: onSave)
+                } else if model.currentPreset.name == "custom" {
+                    chip(L10n.commonSave, fill: theme.tertiaryContainer, content: theme.onTertiaryContainer,
+                         id: "eq.save", action: onSave)
                 }
             }
             .padding(.horizontal, 16)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-        .frame(maxWidth: .infinity)
     }
 
     private func chip(_ title: String, fill: Color, content: Color, id: String, action: @escaping () -> Void) -> some View {
@@ -300,7 +206,7 @@ private struct EqualizerBandCard: View {
             }
             .foregroundStyle(content)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .frame(minHeight: 44)
             .background(fill, in: Capsule())
         }
         .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
@@ -308,84 +214,52 @@ private struct EqualizerBandCard: View {
     }
 }
 
-/// Android `EffectControlsSection`: the 150 pt effect cards side by side, scrolling horizontally.
-private struct EqualizerEffectsRow: View {
-    let prefs: EqualizerPreferences
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                EqualizerEffectCard(title: L10n.equalizerBassBoost, value: prefs.bassBoostStrength,
-                                    isEnabled: prefs.bassBoostEnabled,
-                                    onValue: { prefs.bassBoostStrength = $0 },
-                                    onEnabled: { prefs.bassBoostEnabled = $0 })
-                EqualizerEffectCard(title: L10n.equalizerVirtualizer, value: prefs.virtualizerStrength,
-                                    isEnabled: prefs.virtualizerEnabled,
-                                    onValue: { prefs.virtualizerStrength = $0 },
-                                    onEnabled: { prefs.virtualizerEnabled = $0 })
-                EqualizerEffectCard(title: L10n.equalizerLoudness, value: prefs.loudnessEnhancerStrength,
-                                    isEnabled: prefs.loudnessEnhancerEnabled,
-                                    onValue: { prefs.loudnessEnhancerStrength = $0 },
-                                    onEnabled: { prefs.loudnessEnhancerEnabled = $0 })
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-        }
-        .scrollClipDisabled()
-    }
-}
-
-/// Android `EffectCard`: the wavy arc slider with the percentage inside, a switch (0.8×) and the title.
-private struct EqualizerEffectCard: View {
-    let title: String
-    let value: Int
-    let isEnabled: Bool
-    let onValue: (Int) -> Void
-    let onEnabled: (Bool) -> Void
-
+private struct EqualizerEffects: View {
+    @Bindable var prefs: EqualizerPreferences
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        let percent = value * 100 / EqualizerBands.maxStrength
-        VStack(spacing: 4) {
-            ZStack {
-                WavyArcSlider(value: value, enabled: isEnabled,
-                              activeColor: isEnabled ? theme.primary : theme.onSurfaceVariant.opacity(0.3),
-                              inactiveColor: theme.surfaceContainerHighest,
-                              thumbColor: isEnabled ? theme.primary : theme.onSurfaceVariant, onChange: onValue)
-                    .frame(width: 150, height: 150)
-                Text("\(percent)%")
-                    .pixlFont(.titleMedium)
-                    .foregroundStyle(isEnabled ? theme.onSurface : theme.onSurfaceVariant)
-                    .monospacedDigit()
+        GlassCard(cornerRadius: 24, tint: theme.surfaceContainerLow) {
+            VStack(spacing: 0) {
+                effect(L10n.equalizerBassBoost, enabled: $prefs.bassBoostEnabled, strength: $prefs.bassBoostStrength)
+                Divider()
+                effect(L10n.equalizerVirtualizer, enabled: $prefs.virtualizerEnabled, strength: $prefs.virtualizerStrength)
+                Divider()
+                effect(L10n.equalizerLoudness, enabled: $prefs.loudnessEnhancerEnabled, strength: $prefs.loudnessEnhancerStrength)
             }
-            .offset(y: 5)
-            .frame(width: 150, height: 110)
-            .accessibilityElement()
-            .accessibilityLabel(title)
-            .accessibilityValue("\(percent)%")
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: onValue(min(value + 50, EqualizerBands.maxStrength))
-                case .decrement: onValue(max(value - 50, 0))
-                @unknown default: break
+            .padding(.horizontal, 16)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func effect(_ title: String, enabled: Binding<Bool>, strength: Binding<Int>) -> some View {
+        VStack(spacing: 4) {
+            Toggle(isOn: enabled) {
+                HStack(spacing: 8) {
+                    Text(title).pixlFont(.titleSmall, weight: .semibold)
+                    Spacer(minLength: 0)
+                    if enabled.wrappedValue {
+                        Text("\(strength.wrappedValue / 10)%")
+                            .pixlFont(.labelMedium)
+                            .monospacedDigit()
+                            .foregroundStyle(theme.onSurfaceVariant)
+                    }
                 }
             }
-            Toggle(title, isOn: Binding(get: { isEnabled }, set: onEnabled))
-                .labelsHidden()
-                .tint(theme.primary)
-                .scaleEffect(0.8)
-            Text(title)
-                .pixlFont(.labelLarge)
-                .foregroundStyle(theme.onSurface)
-                .lineLimit(1)
+            .frame(minHeight: 44)
+            .accessibilityLabel(title)
+            .accessibilityIdentifier("eq.effect.\(title)")
+            if enabled.wrappedValue {
+                Slider(value: Binding(get: { Double(strength.wrappedValue) },
+                                      set: { strength.wrappedValue = Int($0.rounded()) }),
+                       in: 0...Double(EqualizerBands.maxStrength), step: 10)
+                    .accessibilityLabel(title)
+                    .accessibilityValue("\(strength.wrappedValue / 10)%")
+            }
         }
-        .padding(12)
-        .frame(width: 150)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .pixlGlass(in: RoundedRectangle(cornerRadius: 24, style: .continuous),
-                   tint: theme.surfaceContainerLow.opacity(SettingsTint.row))
-        .accessibilityIdentifier("eq.effect.\(title)")
+        .padding(.vertical, 8)
+        .tint(theme.primary)
+        .foregroundStyle(theme.onSurface)
     }
 }
 
@@ -540,7 +414,8 @@ private struct SystemVolumeSlider: UIViewRepresentable {
 
 private struct CustomPresetsSheet: View {
     let model: EqualizerModel
-    let onRename: (EqualizerPreset) -> Void
+    @State private var renameTarget: EqualizerPreset?
+    @State private var nameDraft = ""
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
@@ -577,6 +452,15 @@ private struct CustomPresetsSheet: View {
         }
         .padding(.top, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .alert(L10n.equalizerPresetsRenameTitle, isPresented: Binding(
+            get: { renameTarget != nil }, set: { if !$0 { renameTarget = nil } })) {
+            TextField(L10n.equalizerPresetNamePlaceholder, text: $nameDraft)
+            Button(L10n.commonCancel, role: .cancel) {}
+            Button(L10n.equalizerActionRename) {
+                if let target = renameTarget { model.renameCustomPreset(target.name, to: nameDraft) }
+            }
+            .disabled(!model.canNamePreset(nameDraft))
+        }
     }
 
     private func row(_ preset: EqualizerPreset, isPinned: Bool) -> some View {
@@ -604,7 +488,8 @@ private struct CustomPresetsSheet: View {
                 model.togglePin(preset.name)
             }
             iconButton("pencil", color: theme.onSurfaceVariant, label: L10n.equalizerPresetsCdRename) {
-                onRename(preset)
+                nameDraft = preset.displayName
+                renameTarget = preset
             }
             iconButton("trash", color: theme.error, label: L10n.equalizerPresetsCdDelete) {
                 model.deleteCustomPreset(preset)
