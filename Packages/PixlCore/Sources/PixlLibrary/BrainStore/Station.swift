@@ -27,6 +27,9 @@ public struct Station: Sendable, Hashable {
 
     public var isArtist: Bool { kind == Session.seedStationArtist }
 
+    /// Endless Listening: the station that starts from the listener's taste islands and keeps going (`sourceEndless`).
+    public var isEndless: Bool { source == Self.sourceEndless }
+
     static let separator = "\u{1F}"
     static let idsSeparator = "\u{1E}"
 
@@ -37,6 +40,10 @@ public struct Station: Sendable, Hashable {
     /// A station from a genre or a mood of the atlas (8.3, stage 2b): the listener's own songs under the node seed it.
     public static let sourceGenre = 4
     public static let sourceMood = 5
+    /// Endless Listening: up to five seeds, one for each of the listener's taste islands (their top artists with fewer than two
+    /// islands). Planned and played like any station with several seeds; an old build that does not know this source refuses the
+    /// string, so it ends no queue.
+    public static let sourceEndless = 6
 
     public init(id: String, kind: Int32, seedMediaId: String, title: String, artistName: String, startedAtMs: Int64,
                 source: Int? = nil, seedMediaIds: [String]? = nil) {
@@ -56,6 +63,11 @@ public struct Station: Sendable, Hashable {
         return Station(id: idOf(kind: Session.seedStationSong, seedMediaId: first, source: source),
                        kind: Session.seedStationSong, seedMediaId: first, title: title, artistName: "",
                        startedAtMs: nowMs, source: source, seedMediaIds: seedMediaIds)
+    }
+
+    /// Endless Listening: `seedMediaIds` are the island seeds, best first; `title` is the name the queue shows.
+    public static func endless(seedMediaIds: [String], title: String, nowMs: Int64) -> Station {
+        fromSource(sourceEndless, seedMediaIds: seedMediaIds, title: title, nowMs: nowMs)
     }
 
     public static func song(seedMediaId: String, title: String, primaryArtist: String, nowMs: Int64) -> Station {
@@ -93,7 +105,7 @@ public struct Station: Sendable, Hashable {
             return Station(id: idOf(kind: kind, seedMediaId: parts[1]), kind: kind, seedMediaId: parts[1], title: parts[2],
                            artistName: parts[3], startedAtMs: startedAtMs)
         }
-        guard let source = Int(parts[5]), source >= sourceSong, source <= sourceMood else { return nil }
+        guard let source = Int(parts[5]), source >= sourceSong, source <= sourceEndless else { return nil }
         var ids = parts[6].components(separatedBy: idsSeparator).filter { !$0.isEmpty }
         if ids.isEmpty { ids = [parts[1]] }
         return Station(id: idOf(kind: kind, seedMediaId: parts[1], source: source), kind: kind, seedMediaId: parts[1],

@@ -172,3 +172,8 @@ How each `fn` is replayed:
 - `assistbatch.jsonl`: `cacheKey(model, kind, input)`; `islandNames`: `validateIslandNames(ins, outs)` (a row of `ins` is `[id,
   genres joined by |, artists joined by |]`); `tags`: `validateTags(shortlists, outs)`; `artistNames`: `validateArtistNames(raw,
   known)`. No regular expressions anywhere, as in the other files.
+- `endless.jsonl` (Endless Listening): `seeds`: `EndlessSeeds.pick(islands, artists)` for `islands` = `[id, weight, [[rid, aid, weight] ...]]`
+  and `artists` = `[aid, weight, [[rid, aid, weight] ...]]`, the seeds `[rid, aid, islandId]` (-1 for the artist fallback). `notes`:
+  `HostNotes.notes(slots, taken)` for `slots` = `[artist, genre, genreFact, year, island, newFromPlayedArtist 1|0, sideways 1|0]` and
+  `taken` = `[index, span]` (the set notes already in the queue), each note `[index, kind, a, b, text]` with `text = HostNotes.text(note)`.
+  `fact`: `HostNotes.factOf(raw)`. `speakable`: `HostNotes.isSpeakable(text)`. Word and sentence counting splits on a space and on `.`, `!`, `?`; no regular expressions.
