@@ -425,7 +425,7 @@ final class DualDeckEngine: PlaybackEngine {
     // MARK: Effects
 
     func applyEqualizer(_ settings: EqualizerSettings) {
-        effects.setEqualizer(settings, sampleRate: session.outputSampleRate)
+        effects.setEqualizer(settings)
     }
 
     /// Mid/side instrumental fallback, 0 (off) … 1.
@@ -744,6 +744,7 @@ final class DualDeckEngine: PlaybackEngine {
                 startTiming = nil
             }
             setPreparing(loadTask != nil || (playWhenReady && status == .waitingToPlayAtSpecifiedRate))
+            onTimingChanged?()
             onSpatialItemChanged?()
         case .itemEnded(let item):
             guard deck === active, item === activeItem, deck.upcoming.isEmpty else { return }
@@ -852,8 +853,7 @@ final class DualDeckEngine: PlaybackEngine {
         case .rebuildAfterReset:
             rebuildAfterMediaServicesReset()
         case .routeChanged:
-            let rate = session.outputSampleRate
-            if abs(rate - effects.designSampleRate.load()) > 0.5 { effects.setEqualizer(effects.settings, sampleRate: rate) }
+            break  // AVFoundation prepares each tap again when its processing format changes.
         }
     }
 
