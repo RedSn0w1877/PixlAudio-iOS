@@ -7,6 +7,7 @@ import PixlLibrary
 nonisolated enum EndlessStrings {
     static var title: String { String(localized: "Endless Listening") }
     static var nothingYet: String { String(localized: "Play a few songs first. Endless Listening starts from what you play.") }
+    static var alreadyPlaying: String { String(localized: "Endless Listening is already playing.") }
 
     // MARK: The card on Home
 
@@ -41,11 +42,18 @@ nonisolated enum EndlessStrings {
         case .surprise: chipSurprise
         }
     }
-    static var replyNew: String { String(localized: "Okay. The next songs lean towards new music.") }
-    static var replyFamiliar: String { String(localized: "Okay. The next songs lean towards what you know.") }
-    static var replySurprise: String { String(localized: "Okay. Five songs that lean new are next.") }
-    static var replyUpbeat: String { String(localized: "Okay. Five livelier songs are next.") }
-    static var replySlower: String { String(localized: "Okay. Five slower songs are next.") }
+    static var replyNew: String { String(localized: "Okay. The next songs lean towards new music, until this station ends.") }
+    static var replyFamiliar: String { String(localized: "Okay. Back to your usual mix of new and familiar.") }
+    /// The count is what the steer really queued, never a number the host assumed.
+    static func replySurprise(_ count: Int) -> String {
+        count == 1 ? String(localized: "Okay. One song that leans new is next.") : String(localized: "Okay. \(count) songs that lean new are next.")
+    }
+    static func replyUpbeat(_ count: Int) -> String {
+        count == 1 ? String(localized: "Okay. One livelier song is next.") : String(localized: "Okay. \(count) livelier songs are next.")
+    }
+    static func replySlower(_ count: Int) -> String {
+        count == 1 ? String(localized: "Okay. One slower song is next.") : String(localized: "Okay. \(count) slower songs are next.")
+    }
     static var replyWhy: String { String(localized: "Here is why it is on.") }
     static var replyNoWhy: String { String(localized: "You picked this one yourself, so there is no reason to give.") }
     static var replyNothing: String { String(localized: "I could not change the queue just now.") }

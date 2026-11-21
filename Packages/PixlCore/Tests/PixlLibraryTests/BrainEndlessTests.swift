@@ -405,7 +405,7 @@ struct SetNoteLinesHostTests {
     @Test func anIslandNameMakesANoteAndTheNextOneIsAtLeastFiveTracksLater() {
         var islands: [String: String] = [:]
         for song in eight { islands[song.id] = "Soft pop" }
-        let notes = SetNoteLines.forQueue(eight, currentIndex: 0, heard: [], host: facts(islands: islands))
+        let notes = SetNoteLines.forQueue(eight, currentIndex: 0, heard: Set(eight.map(\.id)), host: facts(islands: islands))
         #expect(Set(notes.byIndex.keys) == [0, 5])
         #expect(notes.byIndex[0] == "From your Soft pop side.")
         #expect(notes.current == "From your Soft pop side.")
@@ -435,12 +435,74 @@ struct SetNoteLinesHostTests {
                      outside("aaaaaaaaaa4", "D"), library("5", "E"), library("6", "F"), library("7", "G"), library("8", "H")]
         var islands: [String: String] = [:]
         for song in queue { islands[song.id] = "Soft pop" }
-        let result = SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1", "2", "3"], host: facts(islands: islands))
+        let result = SetNoteLines.forQueue(queue, currentIndex: 0, heard: Set(queue.map(\.id)).subtracting(["yt:aaaaaaaaaa4"]),
+                                           host: facts(islands: islands))
         // The set note is on the first of its three tracks; the host speaks again only after the five tracks it covers.
         #expect(result.byIndex[0] == "Three from your pop side, then something new from D.")
         #expect(result.byIndex.keys.filter { (1...4).contains($0) }.isEmpty)
         #expect(Set(result.byIndex.keys) == [0, 5])
         #expect(result.byIndex[5] == "From your Soft pop side.")
+    }
+
+    @Test func anIslandNoteNeedsARecordedPlayAndANewReleaseMustNotHaveBeenHeard() {
+        let queue = [library("1", "Clairo"), library("2", "Mono")]
+        let islands = ["1": "Soft pop", "2": "Soft pop"]
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: [], host: facts(islands: islands)).byIndex.isEmpty)
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1"], host: facts(islands: islands)).byIndex == [0: "From your Soft pop side."])
+        // The stale reason of a song that was already heard must not claim "new".
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: ["1"], host: facts(why: ["1": "new_release"])).byIndex.isEmpty)
+    }
+
+    @Test func movingOnOneTrackAtATimeKeepsOneNoteInFiveTracks() {
+        var islands: [String: String] = [:]
+        for song in eight { islands[song.id] = "Soft pop" }
+        let heard = Set(eight.map(\.id))
+        let f = facts(islands: islands)
+        // Track 0 shows its note; going on to tracks 1 to 4 shows none (the card used to repeat at every track); track 5 may.
+        let shown = (0...6).filter { SetNoteLines.forQueue(eight, currentIndex: $0, heard: heard, host: f).current != nil }
+        #expect(shown == [0, 5])
+    }
+
+    @Test func theCardTheRowsAndTheVoiceShareOneMemoryAndSoAgree() {
+        // The three callers (player card, queue rows, spoken line) call forQueue on their own with the same facts: whoever asks first
+        // for a track marks it, and the others see the same answer for it and for the tracks after it.
+        var islands: [String: String] = [:]
+        for song in eight { islands[song.id] = "Soft pop" }
+        let heard = Set(eight.map(\.id))
+        let f = facts(islands: islands)
+        for i in 0...6 {
+            let card = SetNoteLines.forQueue(eight, currentIndex: i, heard: heard, host: f)
+            let rows = SetNoteLines.forQueue(eight, currentIndex: i, heard: heard, host: f)
+            let voice = SetNoteLines.forQueue(eight, currentIndex: i, heard: heard, host: f)
+            #expect(card == rows && rows == voice, "track \(i)")
+        }
+        #expect(f.memory.has("1") && f.memory.has("6"))
+        #expect(!f.memory.has("2"))
+    }
+
+    @Test func aStepSidewaysSaysOnlyTheGenreTheEngineFlagged() {
+        let queue = [library("1", "A", genre: "k-pop"), library("2", "B", genre: "bossa nova")]
+        let notes = SetNoteLines.forQueue(queue, currentIndex: 1, heard: ["1"], host: facts(why: ["2": "adjacent_genre"]))
+        #expect(notes.byIndex == [1: "A step sideways: bossa nova."])
+    }
+
+    @Test func withEndlessListeningsHostNotesOffTheQueueHasNoNoteAtAll() {
+        let queue = [library("1", "A", genre: "pop"), library("2", "B", genre: "pop"), library("3", "C", genre: "pop"), outside("aaaaaaaaaa4", "D")]
+        let heard: Set<String> = ["1", "2", "3"]
+        #expect(!SetNoteLines.forQueue(queue, currentIndex: 0, heard: heard, host: nil).byIndex.isEmpty, "the set note exists when notes are on")
+        #expect(SetNoteLines.forQueue(queue, currentIndex: 0, heard: heard, host: nil, notesOff: true).byIndex.isEmpty)
+    }
+
+    @Test func theMemoryKeepsOnlyAFewIdsAndCanBeCleared() {
+        let memory = HostNoteMemory()
+        for k in 0..<(HostNoteMemory.capacity + 10) { memory.mark("s\(k)") }
+        #expect(memory.snapshot().count == HostNoteMemory.capacity)
+        #expect(!memory.has("s0") && memory.has("s\(HostNoteMemory.capacity + 9)"))
+        memory.mark("s20")
+        memory.mark("s20")
+        #expect(memory.snapshot().count == HostNoteMemory.capacity)
+        memory.clear()
+        #expect(memory.snapshot().isEmpty)
     }
 }
 
@@ -462,6 +524,26 @@ struct EndlessSeedSourceTests {
         #expect(seeds.allSatisfy { $0.song.id.hasPrefix("lib") }, "library songs only")
         // No island, no island name: the card says nothing it cannot back.
         #expect(await mixes.endlessIslandNames(seeds).isEmpty)
+    }
+
+    @Test func noSeedUntilTheListenerHasPlayedSomething() async {
+        // A library with nothing played: "starts from what you play" would be false, so the card hides and a tap says to play a few songs first.
+        let world = BrainMixesTests.World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        let mixes = world.mixes(repository, world.engine(repository))
+        #expect(await mixes.endlessSeeds(now: BrainMixesTests.start).isEmpty)
+    }
+
+    @Test func onlySongsTheListenerPlayedCanBeASeed() async {
+        let world = BrainMixesTests.World()
+        defer { world.tidy() }
+        let repository = world.repository()
+        await world.listen(repository, songs: 0..<3)
+        let mixes = world.mixes(repository, world.engine(repository))
+        let seeds = await mixes.endlessSeeds(now: BrainMixesTests.start)
+        #expect((2...3).contains(seeds.count), "the three played songs, one for each artist: \(seeds.count)")
+        #expect(seeds.allSatisfy { ["lib0", "lib1", "lib2"].contains($0.song.id) }, "never a song nobody played")
     }
 
     @Test func noSeedsInALibraryWithNothingInIt() async {
@@ -488,6 +570,49 @@ struct HostChipTests {
             let actions = [chip.noveltyLevel != nil, chip.steerChange != nil, chip == .why].filter { $0 }
             #expect(actions.count == 1, "\(chip) does one thing")
         }
+    }
+}
+
+@Suite("Ask the host: chips apply to this listening only")
+struct HostChipPutBackTests {
+    @Test func theLevelBeforeTheChipsComesBackWhenTheStationEnds() {
+        var hold = HostNoveltyHold()
+        // The listener has Blend saved. "Something new" holds Discover without saving it.
+        #expect(hold.hold(level: Novelty.discover, current: Novelty.blend) == Novelty.discover)
+        #expect(hold.isHolding)
+        // A second chip does not overwrite what was saved.
+        #expect(hold.hold(level: Novelty.discover, current: Novelty.discover) == Novelty.discover)
+        #expect(hold.savedLevel == Novelty.blend)
+        #expect(hold.release() == Novelty.blend)
+        #expect(!hold.isHolding && hold.release() == nil, "put back once")
+    }
+
+    @Test func backToFamiliarGoesToTheLevelBeforeTheChipsAndNeverToDiscover() {
+        var hold = HostNoveltyHold()
+        // Nothing held and Discover in force (saved by the listener): back is Blend, not the Discover they had.
+        #expect(hold.levelBeforeHost(current: Novelty.discover) == Novelty.blend)
+        #expect(hold.levelBeforeHost(current: Novelty.familiar) == Novelty.familiar)
+        _ = hold.hold(level: Novelty.discover, current: Novelty.familiar)
+        #expect(hold.levelBeforeHost(current: Novelty.discover) == Novelty.familiar, "the level before the chips")
+        var discoverSaved = HostNoveltyHold(savedLevel: Novelty.discover)
+        #expect(discoverSaved.levelBeforeHost(current: Novelty.discover) == Novelty.blend)
+        #expect(discoverSaved.release() == Novelty.discover)
+    }
+
+    @Test func aSwitchTheListenerMovesThemselvesCancelsThePutBack() {
+        var hold = HostNoveltyHold()
+        _ = hold.hold(level: Novelty.discover, current: Novelty.blend)
+        hold.forget()
+        #expect(hold.release() == nil)
+    }
+
+    @Test func aReplyNamesTheNumberTheSteerReallyQueued() {
+        #expect(HostSteerReply.of(applied: true, tailChanged: 2, note: "") == .queued(2))
+        #expect(HostSteerReply.of(applied: true, tailChanged: 1, note: "") == .queued(1))
+        #expect(HostSteerReply.of(applied: true, tailChanged: 5, note: "x") == .queued(5))
+        // Applied with nothing queued, or not applied: the engine's own words when it gave some.
+        #expect(HostSteerReply.of(applied: true, tailChanged: 0, note: "") == .nothing(note: ""))
+        #expect(HostSteerReply.of(applied: false, tailChanged: 3, note: "No energy data yet.") == .nothing(note: "No energy data yet."))
     }
 }
 

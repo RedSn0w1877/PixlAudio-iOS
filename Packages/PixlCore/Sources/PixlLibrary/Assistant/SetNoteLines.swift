@@ -46,25 +46,35 @@ public enum SetNoteLines {
         public let islandOf: [String: String]
         public let whyKeyOf: [String: String]
         public let genreFact: @Sendable (String) -> String
+        /// The songs whose note was shown or spoken: one memory for the card, the rows and the voice.
+        public let memory: HostNoteMemory
 
-        public init(islandOf: [String: String], whyKeyOf: [String: String], genreFact: @escaping @Sendable (String) -> String) {
+        public init(islandOf: [String: String], whyKeyOf: [String: String], genreFact: @escaping @Sendable (String) -> String,
+                    memory: HostNoteMemory = HostNoteMemory()) {
             self.islandOf = islandOf
             self.whyKeyOf = whyKeyOf
             self.genreFact = genreFact
+            self.memory = memory
         }
     }
 
     /// The notes of `queue` from `currentIndex`. `heard` nil means the history is not loaded yet: no note is made (a note is true or
     /// absent). With `host` (Endless Listening, the host's notes on) the host-only notes of `HostNotes` join the set notes: never on a
-    /// track that already has one, and at most one note of either kind per five tracks.
-    public static func forQueue(_ queue: [Song], currentIndex: Int, heard: Set<String>?, host: HostFacts? = nil) -> Result {
-        guard let heard, currentIndex >= 0, currentIndex < queue.count else { return .none }
+    /// track that already has one, and at most one note of either kind per five tracks: the window is made again at every track, so
+    /// `HostFacts.memory` says how far back the last note shown or spoken was, and the note of the current track is remembered. `notesOff`
+    /// (Endless Listening is the queue and the host's notes are off) gives no note at all, the set notes included.
+    public static func forQueue(_ queue: [Song], currentIndex: Int, heard: Set<String>?, host: HostFacts? = nil,
+                                notesOff: Bool = false) -> Result {
+        guard let heard, !notesOff, currentIndex >= 0, currentIndex < queue.count else { return .none }
         let end = min(queue.count, currentIndex + lookahead)
         var slots: [SetNotes.Slot] = []
         slots.reserveCapacity(end - currentIndex)
         for i in currentIndex..<end { slots.append(slot(of: queue[i], heard: heard)) }
         let notes = SetNotes.notes(slots)
-        let hostNotes = host.map { HostNotes.notes(hostSlots(queue, currentIndex, end, $0), taken: taken(notes)) } ?? []
+        let hostNotes = host.map {
+            HostNotes.notes(hostSlots(queue, currentIndex, end, $0, heard), taken: taken(notes),
+                            sinceLast: sinceLastNote(queue, currentIndex, $0.memory))
+        } ?? []
         if notes.isEmpty && hostNotes.isEmpty { return .none }
         var byIndex: [Int: String] = [:]
         var current: String?
@@ -78,7 +88,16 @@ public enum SetNoteLines {
             if n.index == 0 { current = text }
             byIndex[currentIndex + n.index] = text
         }
+        // The current track's note is now on the screen (or about to be said): the next window counts from it.
+        if let host, current != nil { host.memory.mark(queue[currentIndex].id) }
         return Result(byIndex: byIndex, current: current)
+    }
+
+    /// How many tracks before `currentIndex` the last note shown or spoken sits (see `HostNotes.tracksSinceNote`).
+    private static func sinceLastNote(_ queue: [Song], _ currentIndex: Int, _ memory: HostNoteMemory) -> Int {
+        let from = max(0, currentIndex - (HostNotes.minGap - 1))
+        let before = queue[from..<currentIndex].map(\.id)
+        return HostNotes.tracksSinceNote(before, index: before.count, noted: memory.snapshot())
     }
 
     /// The set notes as the tracks they describe: a note's own tracks, and the new track it ends on.
@@ -86,7 +105,7 @@ public enum SetNoteLines {
         notes.map { HostNotes.Taken(index: $0.index, span: $0.count + ($0.newArtist.isEmpty ? 0 : 1)) }
     }
 
-    private static func hostSlots(_ queue: [Song], _ from: Int, _ end: Int, _ host: HostFacts) -> [HostNotes.Slot] {
+    private static func hostSlots(_ queue: [Song], _ from: Int, _ end: Int, _ host: HostFacts, _ heard: Set<String>) -> [HostNotes.Slot] {
         var out: [HostNotes.Slot] = []
         out.reserveCapacity(end - from)
         for i in from..<end {
@@ -98,9 +117,10 @@ public enum SetNoteLines {
                 genre: genre,
                 genreFact: genre.isEmpty ? "" : host.genreFact(genre),
                 year: song.year,
-                island: host.islandOf[song.id] ?? "",
+                // "Your side" and "new" follow the set notes' rule: only a song with no recorded play is new, only one with a play is "yours".
+                island: heard.contains(song.id) ? (host.islandOf[song.id] ?? "") : "",
                 // "New from an artist you play": the engine's own reason for the pick (the saved releases hold only artists the listener plays).
-                newFromPlayedArtist: why == "new_release",
+                newFromPlayedArtist: why == "new_release" && !heard.contains(song.id),
                 sideways: why == "adjacent_genre"))
         }
         return out

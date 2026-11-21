@@ -34,7 +34,14 @@ final class HostVoiceController {
     @ObservationIgnored private let playback: PlaybackStore
     @ObservationIgnored private let engine: DualDeckEngine?
     @ObservationIgnored private let speaker = HostSpeaker()
-    @ObservationIgnored private lazy var callObserver = CXCallObserver()
+    /// The call observer reports calls only once it has a delegate (the delegate does nothing: `inCall()` reads `calls`), so it is made with one,
+    /// the first time the host is armed or a voice test is asked for.
+    @ObservationIgnored private let callWatcher = HostCallWatcher()
+    @ObservationIgnored private lazy var callObserver: CXCallObserver = {
+        let observer = CXCallObserver()
+        observer.setDelegate(callWatcher, queue: .main)
+        return observer
+    }()
 
     @ObservationIgnored private var observing = false
     @ObservationIgnored private var armed = false
@@ -108,6 +115,8 @@ final class HostVoiceController {
 
     private func arm() {
         armed = true
+        // Calls are only reported once the observer has its delegate: make it now, before a call can come.
+        _ = callObserver
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil,
                                             queue: .main) { @Sendable [weak self] note in
@@ -143,17 +152,22 @@ final class HostVoiceController {
         trackCounter += 1
         let mine = trackCounter
         guard let note = await noteFor(songId), !Task.isCancelled else { return }
-        let line = HostVoice.line(note)
+        // The note is the app's own (its banned words were looked for in what the app wrote, not in a name): only its length is checked again.
+        let line = HostVoice.line(note, noteChecked: true)
         if line.isEmpty {
             record(spoke: false, cancelled: false, reason: "no_line", text: note)
             return
         }
-        // The first line of a session: the voice is created now, so it is ready when the moment comes.
-        speaker.ensure()
         let startedAt = Self.nowMs() - (engine.hostPlayingSongId == songId ? engine.hostTiming().positionMs : 0)
         while !Task.isCancelled {
             let d = HostVoice.decide(inputs(engine, songId: songId, line: line, counter: mine, startedAt: startedAt))
             if d.action == HostVoice.actWait {
+                if d.reason == "voice_pending" {
+                    // Every other rule allows the line: only now is the synthesizer made (the voices are listed once, for a line that
+                    // will be said). The next decision sees a ready voice, or "no_voice".
+                    speaker.ensure()
+                    continue
+                }
                 try? await Task.sleep(for: .milliseconds(d.waitMs))
             } else if d.action == HostVoice.actSkip {
                 record(spoke: false, cancelled: false, reason: d.reason, text: line)
@@ -198,7 +212,7 @@ final class HostVoiceController {
             msSinceRoute: lastRouteChangeMs == 0 ? Self.longAgoMs : now - lastRouteChangeMs,
             positionMs: isTarget ? timing.positionMs : 0,
             remainingMs: isTarget ? timing.remainingMs : -1,
-            voice: speaker.voiceState,
+            voice: speaker.decisionVoiceState,
             canDuck: engine.hostCanDuck)
     }
 
@@ -249,6 +263,8 @@ final class HostVoiceController {
         speaker.stop()
         engine.hostDuck.end(quick: !said)
         speaking = false
+        // The switch went off while the line was said (`disarm` leaves a running line to end): the synthesizer is given back now.
+        if !armed && !testing { speaker.shutdown() }
         if said {
             record(spoke: true, cancelled: false, reason: "speak", text: line)
         } else {
@@ -286,6 +302,8 @@ final class HostVoiceController {
 
     // MARK: The world: calls and the audio route
 
+    /// A call that has not ended. The audio interruption notification covers a call that takes the audio session; this covers one that
+    /// does not (a call on another route) while a note is due.
     private func inCall() -> Bool { callObserver.calls.contains { !$0.hasEnded } }
 
     private func routeChanged(_ reason: AVAudioSession.RouteChangeReason?) {
@@ -357,4 +375,9 @@ final class HostVoiceController {
 
     /// A monotonic clock in milliseconds (never the wall clock: a change of time zone or a clock correction must not move a decision).
     private static func nowMs() -> Int64 { Int64(DispatchTime.now().uptimeNanoseconds / 1_000_000) }
+}
+
+/// The call observer's delegate: it does nothing. `CXCallObserver.calls` is read when a note is due; the delegate only has to exist.
+nonisolated final class HostCallWatcher: NSObject, CXCallObserverDelegate, @unchecked Sendable {
+    func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {}
 }

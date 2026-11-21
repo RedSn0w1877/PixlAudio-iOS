@@ -22,7 +22,7 @@ public struct EndlessSeedPick: Sendable {
 extension BrainMixes {
     /// The seeds of Endless Listening, drawn from the library tracks of the Your Mix pool (the shortlist of about 500 that Your Mix is
     /// planned from): one for each taste island, biggest first, at most five; the listener's top artists with fewer than two islands
-    /// (`EndlessSeeds`).
+    /// (`EndlessSeeds`). Only tracks the listener has played (a weight above zero) can be a seed: "starts from what you play" has to be true.
     ///
     /// Reads the island fit the weekly build left, the shortlist (cached for the day) and the in-memory affinity tables; never the
     /// network, and it does not open anything that is not already open. Empty when there is nothing to seed from.
@@ -44,10 +44,13 @@ extension BrainMixes {
             weights.reserveCapacity(library.count * 2)
             for t in library { weights[t.rid] = Affinity.weight(state, family: Family.track, key: t.rid, nowMs: now) }
             func track(_ t: LibraryTrack) -> EndlessSeeds.Track { EndlessSeeds.Track(rid: t.rid, aid: t.aid, weight: weights[t.rid] ?? 0.0) }
+            // A track with no weight in the listener's history is never a seed: without plays nothing starts, and the card says "play a
+            // few songs first" instead of beginning from an arbitrary song.
+            let played = library.filter { (weights[$0.rid] ?? 0.0) > 0.0 }
             var islands: [EndlessSeeds.IslandIn] = []
             if set != nil {
                 var byIsland: [Int: [EndlessSeeds.Track]] = [:]
-                for t in library {
+                for t in played {
                     guard let id = memberOf[t.rid] else { continue }
                     byIsland[id, default: []].append(track(t))
                 }
@@ -58,7 +61,7 @@ extension BrainMixes {
             }
             var order: [Int64] = []
             var byArtist: [Int64: [EndlessSeeds.Track]] = [:]
-            for t in library where t.aid != 0 {
+            for t in played where t.aid != 0 {
                 if byArtist[t.aid] == nil { order.append(t.aid) }
                 byArtist[t.aid, default: []].append(track(t))
             }

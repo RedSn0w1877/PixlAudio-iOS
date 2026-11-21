@@ -173,7 +173,10 @@ final class TaisChatModel {
         }
         guard let env = environment() else { return EndlessStrings.replyNothing }
         if let level = chip.noveltyLevel {
-            env.brainActions.setNovelty(level)
+            // For this listening only: not saved, and put back when Endless Listening ends. "Back to familiar" goes to the level the
+            // listener had before the chips (Blend when that was Discover), not to a harder Familiar they never chose.
+            let actions = env.brainActions
+            actions.setNoveltyForHost(chip == .familiar ? actions.levelBeforeHost : level)
             return chip == .new ? EndlessStrings.replyNew : EndlessStrings.replyFamiliar
         }
         if chip == .why {
@@ -186,14 +189,16 @@ final class TaisChatModel {
         }
         guard let change = chip.steerChange, let tools else { return EndlessStrings.replyNothing }
         let outcome = await tools.music.hostSteer(change: change, environment: environment)
-        if outcome.applied {
+        switch HostSteerReply.of(applied: outcome.applied, tailChanged: outcome.tailChanged, note: outcome.note) {
+        case .queued(let count):
             switch chip {
-            case .upbeat: return EndlessStrings.replyUpbeat
-            case .slower: return EndlessStrings.replySlower
-            default: return EndlessStrings.replySurprise
+            case .upbeat: return EndlessStrings.replyUpbeat(count)
+            case .slower: return EndlessStrings.replySlower(count)
+            default: return EndlessStrings.replySurprise(count)
             }
+        case .nothing(let note):
+            return note.isEmpty ? EndlessStrings.replyNothing : note
         }
-        return outcome.note.isEmpty ? EndlessStrings.replyNothing : outcome.note
     }
 
     private func enqueue() -> (prompt: String, thinkingId: Int)? {

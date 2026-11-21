@@ -35,6 +35,14 @@ final class HostSpeaker {
     /// `HostVoice.voiceNone` before `ensure()` and when no usable voice exists; `HostVoice.voiceReady` after it found one.
     var voiceState: Int { synthesizer != nil && voice != nil ? HostVoice.voiceReady : HostVoice.voiceNone }
 
+    /// What `HostVoice.decide` is told: `voiceReady` once a voice was found, `voiceNone` after `ensure()` found none, and `voicePending`
+    /// while the synthesizer was never asked for. The decision only gets as far as "voice pending" when every other rule allows the line, so
+    /// the voices are listed (`ensure()`) for a line that will really be said, never for one that is skipped.
+    var decisionVoiceState: Int {
+        if synthesizer != nil && voice != nil { return HostVoice.voiceReady }
+        return unavailable ? HostVoice.voiceNone : HostVoice.voicePending
+    }
+
     init() {
         relay.onEnd = { [weak self] id, cancelled in
             Task { @MainActor in self?.ended(id, cancelled: cancelled) }

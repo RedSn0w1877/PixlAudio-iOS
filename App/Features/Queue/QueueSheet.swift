@@ -233,7 +233,9 @@ struct QueueSheet: View {
         let currentIndex = playback.currentIndex ?? -1
         // By the position of the row in the queue: a song queued twice has its note on one row only.
         let hostActive = env.endless.wantsHostNotes
-        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: currentIndex, heard: heardIds, host: hostFacts, stamp: hostStamp).byIndex
+        let notesOff = env.endless.hostNotesOff
+        let setNotes = setNoteMemo.notes(queue: queue, currentIndex: currentIndex, heard: heardIds, host: hostFacts, stamp: hostStamp,
+                                         notesOff: notesOff).byIndex
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
@@ -293,7 +295,7 @@ struct QueueSheet: View {
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             // The plays behind the notes are read when the window of the queue changes, on the brain's own actors (never on the main thread).
-            .task(id: setNoteMemo.key(queue: queue, currentIndex: currentIndex, host: hostActive)) {
+            .task(id: setNoteMemo.key(queue: queue, currentIndex: currentIndex, host: hostActive, notesOff: notesOff)) {
                 let window = SetNoteLines.window(queue, currentIndex: currentIndex)
                 heardIds = await SetNoteHistoryLoader.heard(window, repository: env.brain.repository, engine: env.brain.engine)
                 hostFacts = hostActive ? await env.endless.hostFacts(window: window) : nil

@@ -15,6 +15,8 @@ final class StationStore {
     /// The media ids of the album or playlist an album or playlist station came from, for its first batch (6.2: none of
     /// the source's own songs lead). Memory only: after a restart the first batch is long served.
     private(set) var sourceIds: Set<String> = []
+    /// The saved level while the host's chips ("Something new") hold another one for this listening only (`HostNoveltyHold`).
+    private var hostHold = HostNoveltyHold()
 
     init(defaults: UserDefaults?) {
         self.defaults = defaults
@@ -44,6 +46,8 @@ final class StationStore {
 
     func start(_ station: Station, sourceIds: Set<String> = []) {
         ensureLoaded()
+        // Another station than Endless Listening begins: the level the host's chips held goes back.
+        if !station.isEndless { putBackHostNovelty() }
         self.sourceIds = sourceIds
         self.station = station
         defaults?.set(station.encode(), forKey: PreferenceKeys.brainStation)
@@ -53,19 +57,46 @@ final class StationStore {
     func clear() {
         ensureLoaded()
         guard station != nil else { return }
+        putBackHostNovelty()
         sourceIds = []
         station = nil
         defaults?.removeObject(forKey: PreferenceKeys.brainStation)
     }
 
-    /// True when the level changed.
+    /// True when the level changed. The listener's own switch: it is saved, and nothing the host's chips held is put back.
     @discardableResult
     func setNovelty(_ newLevel: Int) -> Bool {
         ensureLoaded()
         let next = Novelty.clamp(newLevel)
-        guard next != level else { return false }
+        // A level a chip held is only in memory: the listener choosing it too still has to save it.
+        let held = hostHold.isHolding
+        hostHold.forget()
+        guard next != level || held else { return false }
+        let changed = next != level
         level = next
         defaults?.set(next, forKey: PreferenceKeys.brainNovelty)
+        return changed
+    }
+
+    /// The host's "Something new" / "Back to familiar": `newLevel` applies now and is NOT saved; the saved level comes back when Endless
+    /// Listening ends. True when the level in force changed.
+    @discardableResult
+    func setNoveltyForHost(_ newLevel: Int) -> Bool {
+        ensureLoaded()
+        let next = hostHold.hold(level: newLevel, current: level)
+        guard next != level else { return false }
+        level = next
         return true
+    }
+
+    /// The level "Back to familiar" goes back to: the one saved before the chips, Blend when that was Discover or is not known.
+    func levelBeforeHost() -> Int {
+        ensureLoaded()
+        return hostHold.levelBeforeHost(current: level)
+    }
+
+    private func putBackHostNovelty() {
+        guard let saved = hostHold.release() else { return }
+        level = saved
     }
 }

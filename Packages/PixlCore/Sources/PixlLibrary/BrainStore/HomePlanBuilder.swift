@@ -51,9 +51,11 @@ public actor HomePlanBuilder {
         if waiters.isEmpty { busy = false } else { waiters.removeFirst().resume() }
     }
 
-    /// True when the saved plan is for another day or daypart, or was made under other taste adjustments.
+    /// True when the saved plan is for another day or daypart, was made under other taste adjustments, or is from before the current plan version.
     public func isDue(_ plan: HomePlan?, nowMs: Int64, taste: String) async -> Bool {
         guard let plan else { return true }
+        // A plan from before the Endless Listening card existed is shown, and made again at once so the card is there.
+        if plan.planVersion < HomePlan.version { return true }
         if !BrainKey.sameBytes(plan.taste, taste) { return true }
         // The islands were fitted again since this plan was made: its Daily Mix cards number islands that may have moved.
         if let set = await mixes.parts?.islands.current(), set.fitAtMs != plan.islandFitAtMs { return true }

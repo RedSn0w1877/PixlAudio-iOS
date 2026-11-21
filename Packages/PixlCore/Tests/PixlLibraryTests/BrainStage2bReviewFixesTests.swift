@@ -146,6 +146,25 @@ struct BrainStage2bReviewFixesTests {
         #expect(round.islandFitAtMs == 77)
     }
 
+    @Test func aPlanSavedBeforeTheEndlessCardIsStillReadAndIsDueAtOnce() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("homeplan-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = HomePlanStore(directory: dir)
+        let old = Data(#"{"planVersion":1,"generatedAtMs":5,"planKey":9,"mixes":[],"shelves":[]}"#.utf8)
+        try old.write(to: dir.appendingPathComponent(HomePlanStore.fileName))
+        let read = await store.read()
+        #expect(read?.planVersion == 1, "shown at once, not thrown away")
+        let fresh = HomePlan(generatedAtMs: 5, planKey: 9)
+        #expect(fresh.planVersion == HomePlan.version && HomePlan.version > 1)
+        #expect(await store.write(fresh))
+        #expect(await store.read()?.planVersion == HomePlan.version)
+        // A file from a newer build than this one is not read.
+        let newer = Data(#"{"planVersion":99,"generatedAtMs":5,"planKey":9,"mixes":[],"shelves":[]}"#.utf8)
+        try newer.write(to: dir.appendingPathComponent(HomePlanStore.fileName))
+        #expect(await store.read() == nil)
+    }
+
     @Test func onlyTheNewestBuildOfEachListIsTakenAwayFromTheOthers() {
         let log = [
             Repetition.Served(surface: 1, builtAtMs: 100, rids: [1, 2], surfaceId: "daily:1"),

@@ -25,7 +25,7 @@ public actor HostNoteFacts {
 
     /// What the host may say about `window` (the current song and the next few): the island name of each library song, the engine's reason
     /// key of each pick, and the atlas' description of the genres of the window. Every part is read from what is already stored.
-    public func facts(window: [Song], why: [String: QueueWhy]) async -> SetNoteLines.HostFacts {
+    public func facts(window: [Song], why: [String: QueueWhy], memory: HostNoteMemory = HostNoteMemory()) async -> SetNoteLines.HostFacts {
         var keys: [String: String] = [:]
         for song in window {
             if let w = why[song.id] { keys[song.id] = w.key }
@@ -41,7 +41,7 @@ public actor HostNoteFacts {
             }
         }
         let facts = genreFacts
-        return SetNoteLines.HostFacts(islandOf: islands, whyKeyOf: keys, genreFact: { facts[$0] ?? "" })
+        return SetNoteLines.HostFacts(islandOf: islands, whyKeyOf: keys, genreFact: { facts[$0] ?? "" }, memory: memory)
     }
 
     /// The island name of each of `songs` the listener's library has a placed track for, by song id. Library songs only; an unnamed

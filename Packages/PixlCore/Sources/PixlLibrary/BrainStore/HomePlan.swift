@@ -166,7 +166,11 @@ public struct PlanHero: Codable, Sendable, Equatable {
 }
 
 public struct HomePlan: Codable, Sendable, Equatable {
-    public static let version = 1
+    /// 2: a plan can hold the Endless Listening card. A plan saved before (version 1) is still read and shown, and is due at once, so the
+    /// card appears at the next Home without waiting for the next daypart (iOS only: Android's plan stays at 1 and waits for its next build).
+    public static let version = 2
+    /// The oldest plan file that is still read.
+    public static let oldestReadable = 1
 
     public var planVersion: Int
     public var generatedAtMs: Int64
@@ -249,7 +253,8 @@ public actor HomePlanStore {
 
     public func read() -> HomePlan? {
         guard let data = try? Data(contentsOf: url), !data.isEmpty, data.count <= Self.maxBytes,
-              let plan = try? JSONDecoder().decode(HomePlan.self, from: data), plan.planVersion == HomePlan.version else { return nil }
+              let plan = try? JSONDecoder().decode(HomePlan.self, from: data),
+              plan.planVersion >= HomePlan.oldestReadable, plan.planVersion <= HomePlan.version else { return nil }
         return plan
     }
 

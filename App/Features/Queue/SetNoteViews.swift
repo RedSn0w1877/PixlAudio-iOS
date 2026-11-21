@@ -8,6 +8,8 @@ struct SetNoteKey: Hashable {
     let current: Int
     /// The host's notes are wanted (Endless Listening is the queue and its switch is on): turning it on or off asks again.
     var host = false
+    /// Endless Listening is the queue and its host notes are off: the queue has no note at all.
+    var notesOff = false
 }
 
 /// The notes of the queue, made again only when the queue's next songs, the current song or the history of plays change (docs/brain-spec.md,
@@ -20,24 +22,26 @@ final class SetNoteMemo {
     private var result = SetNoteLines.Result.none
     private var valid = false
 
-    func key(queue: [Song], currentIndex: Int, host: Bool = false) -> SetNoteKey {
-        guard currentIndex >= 0, currentIndex < queue.count else { return SetNoteKey(ids: [], current: currentIndex, host: host) }
+    func key(queue: [Song], currentIndex: Int, host: Bool = false, notesOff: Bool = false) -> SetNoteKey {
+        guard currentIndex >= 0, currentIndex < queue.count else {
+            return SetNoteKey(ids: [], current: currentIndex, host: host, notesOff: notesOff)
+        }
         let end = min(queue.count, currentIndex + SetNoteLines.lookahead)
-        return SetNoteKey(ids: queue[currentIndex..<end].map(\.id), current: currentIndex, host: host)
+        return SetNoteKey(ids: queue[currentIndex..<end].map(\.id), current: currentIndex, host: host, notesOff: notesOff)
     }
 
     /// The notes; none until the history of plays has been read (`heard` nil): a note is true or absent. `host` are the facts of the host's
     /// notes (Endless Listening) and `stamp` changes whenever they were read again.
     func notes(queue: [Song], currentIndex: Int, heard: Set<String>?, host: SetNoteLines.HostFacts? = nil,
-               stamp: Int = 0) -> SetNoteLines.Result {
+               stamp: Int = 0, notesOff: Bool = false) -> SetNoteLines.Result {
         guard heard != nil, currentIndex >= 0, currentIndex < queue.count else { return .none }
-        let next = key(queue: queue, currentIndex: currentIndex, host: host != nil)
+        let next = key(queue: queue, currentIndex: currentIndex, host: host != nil, notesOff: notesOff)
         if valid, next == key, heard == self.heard, stamp == self.stamp { return result }
         key = next
         self.heard = heard
         self.stamp = stamp
         valid = true
-        result = SetNoteLines.forQueue(queue, currentIndex: currentIndex, heard: heard, host: host)
+        result = SetNoteLines.forQueue(queue, currentIndex: currentIndex, heard: heard, host: host, notesOff: notesOff)
         return result
     }
 }
@@ -94,7 +98,8 @@ struct PlayerSetNoteLine: View {
         let queue = playback.queue
         let current = playback.currentIndex ?? -1
         let hostActive = env.endless.wantsHostNotes
-        let note = memo.notes(queue: queue, currentIndex: current, heard: heard, host: hostFacts, stamp: hostStamp).current
+        let notesOff = env.endless.hostNotesOff
+        let note = memo.notes(queue: queue, currentIndex: current, heard: heard, host: hostFacts, stamp: hostStamp, notesOff: notesOff).current
         VStack(spacing: 0) {
             if let onAskHost {
                 if let note {
@@ -116,7 +121,7 @@ struct PlayerSetNoteLine: View {
             }
         }
         // The history of plays is read when the window of the queue changes, off the main thread.
-        .background(Color.clear.frame(width: 0, height: 0).task(id: memo.key(queue: queue, currentIndex: current, host: hostActive)) {
+        .background(Color.clear.frame(width: 0, height: 0).task(id: memo.key(queue: queue, currentIndex: current, host: hostActive, notesOff: notesOff)) {
             let window = SetNoteLines.window(queue, currentIndex: current)
             heard = await SetNoteHistoryLoader.heard(window, repository: env.brain.repository, engine: env.brain.engine)
             hostFacts = hostActive ? await env.endless.hostFacts(window: window) : nil

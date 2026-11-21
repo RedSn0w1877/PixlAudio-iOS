@@ -17,6 +17,9 @@ final class EndlessState {
     private var spokenValue: Bool
     /// The spoken host (milestone E2): set once by `AppEnvironment` when there is a real engine; nil in UI tests and the demo.
     @ObservationIgnored var voice: HostVoiceController?
+    /// The songs whose host note was shown or spoken: one memory for the player card, the queue rows and the spoken line, so what is shown
+    /// and what is said agree and at most one note per five tracks holds as the player moves.
+    @ObservationIgnored let noteMemory = HostNoteMemory()
 
     init(defaults: UserDefaults?, brain: BrainService?) {
         self.defaults = defaults
@@ -62,6 +65,9 @@ final class EndlessState {
     /// True when the host's notes are to be made: the station is the queue and the switch is on.
     var wantsHostNotes: Bool { isActive && notesValue }
 
+    /// True while Endless Listening is the queue and its Host notes switch is off: then the queue shows no note at all, the set notes included.
+    var hostNotesOff: Bool { isActive && !notesValue }
+
     /// The artwork of the first seed, for the colour of the introduction's bars; nil when there is none. One read of the seeds (cached for the
     /// day), off the main actor.
     func firstSeedArt() async -> String? {
@@ -79,6 +85,6 @@ final class EndlessState {
             factsSource = HostNoteFacts(repository: repository, mixes: mixes, atlas: atlas)
         }
         guard let source = factsSource else { return nil }
-        return await source.facts(window: window, why: brain.autoplay.why)
+        return await source.facts(window: window, why: brain.autoplay.why, memory: noteMemory)
     }
 }

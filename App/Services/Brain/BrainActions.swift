@@ -50,9 +50,16 @@ final class BrainActions {
 
     /// Endless Listening: the station from the listener's taste islands (up to five seeds, one for each; their top artists with fewer than
     /// two islands), or picked up when it is already the queue's station. Nothing is read until this is called.
+    ///
+    /// Picked up only when the queue really holds the station's seed: after Stop or a cleared queue the saved station still looks live, and
+    /// resuming it would play nothing (the Home card would be dead). Then it starts fresh. Tapped while it already plays, it says so.
     func startEndless() {
-        if brain.stations.current?.isEndless == true {
-            if !playback.isPlaying { playback.resume() }
+        if let live = brain.stations.current, live.isEndless, queueHoldsSeed(of: live) {
+            if playback.isPlaying {
+                playback.notices.show(EndlessStrings.alreadyPlaying)
+            } else {
+                playback.resume()
+            }
             return
         }
         guard let mixes = brain.mixes else {
@@ -70,6 +77,13 @@ final class BrainActions {
             let station = Station.endless(seedMediaIds: seeds.map(\.song.id), title: EndlessStrings.title, nowMs: currentTimeMillis())
             self.start(station, seed: first.song)
         }
+    }
+
+    /// True when the queue holds the station's seed entry (the same test `AutoplayController.refreshStation` uses to keep a station alive);
+    /// without the real engine (UI tests) the seed's media id in the queue is enough.
+    private func queueHoldsSeed(of station: Station) -> Bool {
+        if let engine { return engine.queue.entries.contains { station.isSeed(mediaId: $0.song.id, tag: $0.brain) } }
+        return playback.queue.contains { station.seedMediaIds.contains($0.id) }
     }
 
     /// A station from an artist: the listener's most-played library track by that artist plays first. `knownSongs`
@@ -180,6 +194,9 @@ final class BrainActions {
 
     private func start(_ station: Station, seed: Song, sourceIds: Set<String> = []) {
         brain.stations.start(station, sourceIds: sourceIds)
+        // Another station than Endless Listening puts back the level the host's chips held (`StationStore.start`).
+        let held = brain.stations.novelty
+        if brain.autoplay.novelty != held { brain.autoplay.novelty = held }
         // The seed is already sounding: it keeps playing, and what was queued behind it goes.
         let inPlace = playback.currentSongId == seed.id && (engine?.startStationInPlace(tag: station.seedTag) ?? false)
         if !inPlace {
@@ -374,6 +391,20 @@ final class BrainActions {
     /// The switch applies from the next track: the engine's tail is planned again.
     func setNovelty(_ level: Int) {
         guard brain.stations.setNovelty(level) else { return }
+        syncNovelty()
+    }
+
+    /// The host's "Something new" / "Back to familiar" (Endless Listening): the level applies to this listening only. It is not saved, and
+    /// the level the listener had comes back when the station ends. "Back to familiar" goes to the level before the chips (`levelBeforeHost`).
+    func setNoveltyForHost(_ level: Int) {
+        guard brain.stations.setNoveltyForHost(level) else { return }
+        syncNovelty()
+    }
+
+    /// The level "Back to familiar" goes back to (Blend when the saved one was Discover or is not known).
+    var levelBeforeHost: Int { brain.stations.levelBeforeHost() }
+
+    private func syncNovelty() {
         let value = brain.stations.novelty
         if brain.autoplay.novelty != value { brain.autoplay.novelty = value }
         autoplay?.noveltyChanged()
