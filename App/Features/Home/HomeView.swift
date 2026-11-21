@@ -272,7 +272,7 @@ struct HomeView: View {
                 HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: { card in
                     env.homePlan.shelfActivated(id)
                     openMix(card)
-                })
+                }, onEndlessHowItWorks: { router.present(AppCover.endlessIntro) })
                 .shelfSeen(shelf.id, env.homePlan)
             case .stations(let id, let title, let subtitle, let cards):
                 HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
@@ -285,7 +285,14 @@ struct HomeView: View {
     }
 
     /// A card of "Made for you" was tapped (8.2): Daily Mix 1 and Your Mix have their own screens, the others open the list.
-    private func openMix(_ card: MixCardUi) { openMix(id: card.mixId, isFirstDaily: card.kind == MixKinds.daily && card.number == 1) }
+    private func openMix(_ card: MixCardUi) {
+        // Endless Listening is a station: its first open shows the introduction, every other starts it or picks it up.
+        if card.kind == MixKinds.endless {
+            if env.endless.isIntroSeen { env.brainActions.startEndless() } else { router.present(AppCover.endlessIntro) }
+            return
+        }
+        openMix(id: card.mixId, isFirstDaily: card.kind == MixKinds.daily && card.number == 1)
+    }
 
     private func openMix(id: String, isFirstDaily: Bool = false) {
         if id.isEmpty { return }

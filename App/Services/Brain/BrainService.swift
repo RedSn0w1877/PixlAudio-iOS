@@ -29,6 +29,9 @@ final class AutoplayState {
     var novelty = Novelty.blend
     /// The reason line of every queue entry that has one, by song id (8.8).
     var why: [String: QueueWhy] = [:]
+
+    /// The queue is the Endless Listening station (`Station.sourceEndless`).
+    var isEndless: Bool { stationTitle != nil && stationSource == Station.sourceEndless }
 }
 
 /// The app's side of the music brain (docs/brain-spec.md, 2.1): it owns the brain's files through `BrainRepository`

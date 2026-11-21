@@ -422,10 +422,14 @@ final class HomePlanState {
         case MixKinds.firstListen: title = BrainStrings.mixFirstListen
         case MixKinds.justDropped: title = BrainStrings.mixJustDropped
         case MixKinds.onRepeat: title = BrainStrings.mixOnRepeat
+        case MixKinds.endless: title = EndlessStrings.title
         default: title = BrainStrings.mixRediscover
         }
         let subtitle: String
-        if m.kind == MixKinds.firstListen {
+        if m.kind == MixKinds.endless {
+            // Endless Listening says it keeps going; the island names are real ones or nothing.
+            subtitle = m.subtitle.isEmpty ? EndlessStrings.cardPlain : EndlessStrings.cardFrom(m.subtitle)
+        } else if m.kind == MixKinds.firstListen {
             subtitle = BrainStrings.mixFirstListenWeek(weekOf(m.builtAtMs))
         } else if !m.subtitle.isEmpty {
             subtitle = m.subtitle

@@ -167,6 +167,8 @@ struct HomeMixShelf: View {
     let subtitle: String
     let cards: [MixCardUi]
     let onOpen: (MixCardUi) -> Void
+    /// "How it works" of the Endless Listening card's menu; nil leaves the menu out.
+    var onEndlessHowItWorks: (() -> Void)?
     @Environment(\.appTheme) private var theme
 
     var body: some View {
@@ -207,7 +209,8 @@ struct HomeMixShelf: View {
                     .pixlFont(.bodyMedium)
                     .lineLimit(2, reservesSpace: true)
                 HStack(spacing: 0) {
-                    Text(verbatim: BrainStrings.songsCount(card.count))
+                    // A station has no song count: it says what it does.
+                    Text(verbatim: card.kind == MixKinds.endless ? EndlessStrings.cardTag : BrainStrings.songsCount(card.count))
                         .pixlFont(.labelLarge)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.right")
@@ -225,6 +228,13 @@ struct HomeMixShelf: View {
         .pixlGlass(in: shape, tint: container.opacity(GlassTint.container), interactive: true)
         .accessibilityLabel(Text(verbatim: card.title))
         .accessibilityIdentifier("home.mix.\(card.mixId)")
+        // The menu of the Endless Listening card: "How it works" replays the introduction. The long press is the card's own, so the
+        // menu is a context menu and no second control sits over the glass.
+        .contextMenu {
+            if card.kind == MixKinds.endless, let onEndlessHowItWorks {
+                Button(EndlessStrings.howItWorks, systemImage: "questionmark.circle", action: onEndlessHowItWorks)
+            }
+        }
     }
 }
 

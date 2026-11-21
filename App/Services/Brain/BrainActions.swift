@@ -48,6 +48,30 @@ final class BrainActions {
         start(station, seed: song)
     }
 
+    /// Endless Listening: the station from the listener's taste islands (up to five seeds, one for each; their top artists with fewer than
+    /// two islands), or picked up when it is already the queue's station. Nothing is read until this is called.
+    func startEndless() {
+        if brain.stations.current?.isEndless == true {
+            if !playback.isPlaying { playback.resume() }
+            return
+        }
+        guard let mixes = brain.mixes else {
+            playback.notices.show(EndlessStrings.nothingYet)
+            return
+        }
+        seedTask?.cancel()
+        seedTask = Task { [weak self] in
+            let seeds = await mixes.endlessSeeds(now: currentTimeMillis())
+            guard let self, !Task.isCancelled else { return }
+            guard let first = seeds.first else {
+                self.playback.notices.show(EndlessStrings.nothingYet)
+                return
+            }
+            let station = Station.endless(seedMediaIds: seeds.map(\.song.id), title: EndlessStrings.title, nowMs: currentTimeMillis())
+            self.start(station, seed: first.song)
+        }
+    }
+
     /// A station from an artist: the listener's most-played library track by that artist plays first. `knownSongs`
     /// are the artist's songs when the caller already has them (the artist page); without them the library is
     /// searched, off the main actor.

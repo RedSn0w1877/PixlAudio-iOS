@@ -99,7 +99,8 @@ struct AutoplayLine: View {
     }
 
     private var title: String {
-        if let stationTitle { return BrainStrings.stationTitle(stationTitle) }
+        // Endless Listening is named for what it is, not "Station · ...".
+        if let stationTitle { return stationSource == Station.sourceEndless ? stationTitle : BrainStrings.stationTitle(stationTitle) }
         return String(localized: "Autoplay")
     }
 
@@ -112,6 +113,7 @@ struct AutoplayLine: View {
         if onConnect { return BrainStrings.connectLine }
         if isStation {
             switch stationSource {
+            case Station.sourceEndless: return EndlessStrings.stationSubtitle
             case Station.sourceAlbum: return BrainStrings.stationSubtitleAlbum
             case Station.sourcePlaylist: return BrainStrings.stationSubtitlePlaylist
             case Station.sourceGenre, Station.sourceMood: return BrainStrings.stationSubtitleGenre

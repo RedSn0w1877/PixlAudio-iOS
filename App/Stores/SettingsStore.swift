@@ -205,6 +205,10 @@ nonisolated enum PreferenceKeys {
     /// the Familiar / Blend / Discover switch (0, 1, 2). Android `brain_station` / `brain_novelty`.
     static let brainStation = "brain_station"
     static let brainNovelty = "brain_novelty"
+    /// Endless Listening: its introduction was shown once, and the host's notes between songs (default on). Android
+    /// `endless_intro_seen` / `endless_host_notes`.
+    static let endlessIntroSeen = "endless_intro_seen"
+    static let endlessHostNotes = "endless_host_notes"
     /// iOS only (2026-10-26): the one-time switch of learning and discovery to on, run when their Settings screen
     /// (Music intelligence) was removed, so a switch an older build left off cannot stay off with nowhere to undo it.
     static let smartFeaturesOnMigrated = "smart_features_on_v1"
