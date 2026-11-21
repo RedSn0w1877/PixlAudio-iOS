@@ -1,0 +1,12 @@
+{"name":"clean","id":"dQw4w9WgXcQ","bucket":17,"random":99}
+{"name":"rotated","id":"9bZkp7q19f0","bucket":3,"random":200,"rotDeg":137}
+{"name":"tilted","id":"kJQP7kiw5Fk","bucket":42,"random":7,"rotDeg":211,"tiltDeg":25,"axisDeg":60}
+{"name":"blurred","id":"a-b_c-d_e-f","bucket":63,"random":255,"rotDeg":77,"tiltDeg":10,"axisDeg":200,"blurMilli":1200}
+{"name":"noisy","id":"0123456789A","bucket":0,"random":0,"rotDeg":301,"tiltDeg":15,"axisDeg":30,"blurMilli":700,"noiseMilli":14000,"noiseSeed":4242}
+{"name":"smudge15","id":"___________","bucket":31,"random":128,"rotDeg":45,"tiltDeg":12,"axisDeg":100,"blurMilli":600,"smudgeSlot":90,"smudgePercent":15,"smudgeLuma":205}
+{"name":"smudge20","id":"-----------","bucket":8,"random":64,"rotDeg":250,"blurMilli":600,"smudgeSlot":160,"smudgePercent":20,"smudgeLuma":135}
+{"name":"glare","id":"AAAAAAAAAAA","bucket":55,"random":1,"rotDeg":33,"tiltDeg":10,"axisDeg":150,"blurMilli":600,"glare":[150,140,40,25,35,250]}
+{"name":"clutter","id":"zZyYxXwWvVu","bucket":12,"random":170,"width":480,"height":360,"cx":240,"cy":170,"half":125,"rotDeg":160,"tiltDeg":20,"axisDeg":300,"blurMilli":600,"noiseMilli":4000,"noiseSeed":77,"clutter":1,"art":4,"artSeed":311}
+{"name":"nomarker","id":"hello_World","bucket":22,"random":33,"rotDeg":99,"tiltDeg":15,"axisDeg":10,"blurMilli":600,"marker":0}
+{"name":"lowcontrast","id":"Q1w2E3r4T5y","bucket":50,"random":222,"rotDeg":188,"tiltDeg":10,"axisDeg":90,"blurMilli":600,"noiseMilli":3000,"noiseSeed":9,"contrastMilli":500,"dotLuma":90,"plateLuma":225}
+{"name":"bigframe","id":"mN8bV7cX6zL","bucket":5,"random":77,"width":640,"height":480,"cx":330,"cy":235,"half":190,"rotDeg":115,"tiltDeg":20,"axisDeg":45,"blurMilli":1500,"noiseMilli":4000,"noiseSeed":5,"clutter":1,"supersample":1}
