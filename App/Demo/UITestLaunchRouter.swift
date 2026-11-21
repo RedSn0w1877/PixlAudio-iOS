@@ -25,6 +25,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case settingsBehavior = "settingsCategory.behavior"
     case settingsLyrics = "settingsCategory.lyrics"
     case settingsSing = "settingsCategory.sing"
+    case settingsSongTap = "settingsCategory.song_tap"
     case settingsAI = "settingsCategory.ai"
     /// AI features with a cloud assistant switched on (Gemini, the demo key): the optional "Cloud assistants" rows.
     case settingsAICloud = "settingsCategory.ai.cloud"
@@ -118,6 +119,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
 
     // Stage 13: AI playlist sheet (from Daily Mix), TAIS DJ chat (empty, and a scripted conversation), AI Playlist Lab
     case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
+    /// Song Tap (2026-11-20): the full-screen surface, switched off (the turn-on card).
+    case songTap
     /// Ask Taizo with the scripted Claude (`DemoClaudeClient`, 2026-10-23): a streamed answer citing a page, then a
     /// 60-song playlist waiting for its Confirm tap.
     case taisChatCloud
@@ -224,6 +227,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsBehavior: return .settingsCategory(.behavior)
         case .settingsLyrics: return .settingsCategory(.lyrics)
         case .settingsSing: return .settingsCategory(.sing)
+        case .settingsSongTap: return .settingsCategory(.songTap)
         case .settingsAI, .settingsAICloud, .settingsAILocalModel, .settingsAILocalModelReady,
              .settingsAILocalModelFailed:
             return .settingsCategory(.ai)
@@ -276,6 +280,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             return nil
         case .settingsPlaybackSpatial: return .settingsCategory(.playback)
         case .howPicksWork, .whyThisSong: return nil
+        case .songTap: return nil
         }
     }
 
@@ -370,6 +375,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
              .setupFinish:
             .setup
         case .aiPlaylistLab: .aiPlaylistLab
+        case .songTap: .songTap
         case .backupRestorePlan, .backupImportReport: .backupImport
         default: nil
         }

@@ -41,6 +41,7 @@ struct RouteDestination: View {
         case .genrePage(let atlasId): GenrePageView(atlasId: atlasId)
         case .cloudProcessing: CloudProcessingSettingsView()
         case .cloudQueue: CloudQueueView()
+        case .songTapDiagnostics: SongTapDiagnosticsView()
         case .accounts: AccountsView()
         case .spotifyDashboard: SpotifyDashboardView()
         case .spotifyBrowse(let query): SpotifyBrowseView(query: query)
@@ -99,6 +100,7 @@ struct CoverDestination: View {
             case .backupImport: BackupImportCover()
             case .backupExport: BackupExportCover()
             case .endlessIntro: EndlessIntroView()
+            case .songTap: SongTapView()
             }
         }
         // The Connect volume pop-up over the lyrics screen and the other covers.

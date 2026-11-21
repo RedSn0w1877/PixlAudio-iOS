@@ -1077,3 +1077,16 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `#Index<Model>([\.a], [\.b])` with two single-key indexes | 18 | /documentation/swiftdata/index | `SchemaV2.SearchHistoryRecord` | Already used on `ArtworkThemeRecord`. |
 | `GlassEffectContainer`-free single `glassEffect` shape under a `LazyVStack` of plain rows | 26 | /documentation/swiftui/view/glasseffect(_:in:) | `HistoryRowsContainer` | One glass layer for a whole list of rows; only the small X is its own glass circle. |
 | `View.scrollDismissesKeyboard(_:)` with `.never` | 16 | /documentation/swiftui/view/scrolldismisseskeyboard(_:) | `SearchRecentList` | Scrolling the recent list keeps the keyboard (the list is shown while the field is focused). |
+
+## Song Tap (2026-11-20, branch `song-tap`, milestone 1)
+| API | Min OS | Doc | Used in | Notes |
+|---|---|---|---|---|
+| `CIFilter.qrCodeGenerator()` (`CIQRCodeGenerator.message`, `.correctionLevel`) | 13 | /documentation/coreimage/cifilter/qrcodegenerator() | `SongTapQrImage` | The code is drawn black on white at error correction `L`, scaled by whole pixels and drawn with `.interpolation(.none)`. |
+| `CIContext.createCGImage(_:from:)` | 5 | /documentation/coreimage/cicontext/createcgimage(_:from:) | `SongTapQrImage` | One context per code (a code is made once per text, not per frame). |
+| `AVCaptureSession`, `AVCaptureDeviceInput`, `AVCaptureMetadataOutput` (`.metadataObjectTypes = [.qr]`, `setMetadataObjectsDelegate(_:queue:)`) | 10 | /documentation/avfoundation/avcapturemetadataoutput | `SongTapCamera` | The QR detector of AVFoundation; the session is configured, started and stopped on one serial queue; the delegate is `nonisolated` and reads at most six times a second. |
+| `AVCaptureVideoPreviewLayer` as a `UIView`'s `layerClass` | 4 | /documentation/avfoundation/avcapturevideopreviewlayer | `SongTapCameraPreview` | The preview behind the Receive card. |
+| `AVCaptureDevice.authorizationStatus(for:)`, `requestAccess(for:)` (async) | 7 / 13 | /documentation/avfoundation/avcapturedevice/requestaccess(for:) | `SongTapCameraAccess` | Asked for lazily, when the listener taps Allow camera. Needs `NSCameraUsageDescription` (project.yml). |
+| `P256.Signing.PrivateKey`, `.publicKey.x963Representation`, `signature(for:)`, `ECDSASignature.rawRepresentation`, `PublicKey.isValidSignature(_:for:)` | 13 | /documentation/cryptokit/p256/signing | `SongTapSigner`, `SongTapVerifier` | Ephemeral key per session; the key is 65 bytes (x9.63), the signature 64 (r then s), the forms Android's java.security signer writes and reads. |
+| `View.sensoryFeedback(trigger:_:)` with an optional feedback | 17 | /documentation/swiftui/view/sensoryfeedback(trigger:_:) | `SongTapView` | The cue (tick, confirm, success, warn) picks the feedback; nil while Haptic feedback is off. |
+| `SensoryFeedback.selection`, `.impact(weight:)`, `.success`, `.warning` | 17 | /documentation/swiftui/sensoryfeedback | `SongTapView` | tick = selection, confirm = light impact, success = success, warn = warning. |
+| `UIApplication.openSettingsURLString` | 8 | /documentation/uikit/uiapplication/opensettingsurlstring | `SongTapView` | "Open Settings" when the camera is off for the app. |

@@ -135,6 +135,11 @@ struct SongOptionsSheet: View {
                             .opacity(0.5)
                             .pixlGlass(in: Capsule(), tint: theme.secondaryContainer.opacity(GlassTint.prominent))
                     }
+                    // Song Drop (Android: the round tertiary button right of Share): share this song with a phone nearby.
+                    Button { SongDrop.start(song, env: env, router: router) } label: { songDropLabel }
+                        .buttonStyle(.plain)
+                        .pixlGlass(in: Capsule(), tint: theme.tertiaryContainer.opacity(GlassTint.prominent), interactive: true)
+                        .accessibilityIdentifier("songInfo.songDrop")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -201,6 +206,15 @@ struct SongOptionsSheet: View {
 
     /// Android weights the queue row 0.6 / 0.4.
     private var nextTileWidth: CGFloat { 140 }
+
+    private var songDropLabel: some View {
+        Image(systemName: "iphone.radiowaves.left.and.right")
+            .font(.system(size: 24, weight: .semibold))
+            .foregroundStyle(theme.onTertiaryContainer)
+            .frame(maxWidth: .infinity, minHeight: 80)
+            .contentShape(.capsule)
+            .accessibilityLabel(SongTapStrings.dropButtonLabel)
+    }
 
     private var shareLabel: some View {
         Image(systemName: "square.and.arrow.up")

@@ -147,3 +147,55 @@ instead of Material. Notes: `docs/handoff/2026-11-11-ios-spatial-ui.md`.
 | Settings › Playback › Sound | Spatial audio (opens the sheet), Cloud renders, "Cloud processing is off" (leads to the master), Prepare ahead (needs cloud renders), "Songs ready: N · X GB on this phone" + Remove downloaded renders (confirm) | same rows |
 | Settings › Playback › Advanced | route, monthly limit ($5 … $200, No limit), storage (14 stops, 256 MB … 64 GB), songs a day ahead (1 … 100), this song's diagnostics | same rows |
 | Player file-info chip (developer mode) | ends with "• Spatial Studio on phone" / "• Spatial Studio cloud render" | same |
+
+
+## Song Tap (2026-11-20, branch `song-tap`, milestones 1 and 2)
+
+Send the song that is playing to another phone with PixlAudio and add it to that phone's library, in the end with a
+Bluetooth tap and one beam animation on both phones; milestone 1 is the code route (a QR code), the core, the receiver
+and the settings. The Android side is `RedSn0w1877/PixlAudio` branch `song-tap` (`:songtap`, `data/songtap/*`,
+`presentation/songtap/*`, `strings_songtap.xml`). Same places, order, words and rules; Liquid Glass instead of
+Material. Notes: `docs/handoff/2026-11-20-song-tap.md`.
+
+| Part | iOS | Android |
+|---|---|---|
+| Pure core | `Packages/PixlCore/Sources/PixlLibrary/SongTap/` (9 files, the names of `:songtap`'s), standard library only, integers only; Android's 13 golden files in `Fixtures/songtap` replayed bit for bit | `:songtap` (new JVM module) |
+| Controller | `SongTapEngine` (PixlCore, decisions, tested over a fake port) + `SongTapController` (app, timers, haptics, library, transports, `@Observable`) made on first use | `SongTapStateHolder` (Hilt singleton) |
+| Receiver save | `SongTapReceiver` (PixlCore, over `SongTapLibrary`) through `AppSongTapLibrary`: `YouTubeLibraryImporter.importTrack` (the importer Search's Save uses), a Spotify-only song through `TrackMatcher.findMatchFanOut`; Undo `LibraryEditor.removeSongs` | `SongTapReceiver` over `SpotifySongTapLibrary`: `importYouTubeMusicTracks`, `removeFromExploredCatalog` |
+| Sender | `SongTapSender` (PixlCore) + `AppSongTapSongIds`: a YouTube song's own video, a Spotify song's matched video, the real Spotify id and recording code; no account, device or name | `SongTapSender` |
+| Signing | `SongTapSigner` / `SongTapVerifier` (CryptoKit P-256, x9.63 key, raw r\|\|s signature), per-session ephemeral key | `SongTapSigner` / `SongTapVerifier` (java.security), same forms |
+| Transport | `SongTapTransport` + `SongTapQrTransport`; camera `SongTapCamera` (AVFoundation QR detector, 6 reads a second, started and stopped on its own queue), code `SongTapQrImage` (CoreImage, level L) | `SongTapTransport` + `QrTransport`; CameraX + zxing |
+| Settings | `SongTapSettings` (UserDefaults: `allow_song_tap` off by default, `song_tap_first_beam_accepted`); Settings › Song Tap (switch + "Open Song Tap") after Sing | `SongTapSettings` (DataStore `song_tap`); Settings › Song Tap after Sing |
+| Player entry | the ⋯ menu's second group, after Share: "Song Tap" with On / Off, opening the cover | the player menu's Listen group, third row |
+| Surface | `AppCover.songTap` (`SongTapView`): turn-on card, Send / Receive, the song's large artwork with the status line, code (one tap away) or camera, result card (Add / Not now the first time), the beam | `Screen.SongTap` |
+| Permissions | Bluetooth asked by the system the first time the screen arms the radio, i.e. right after "Turn on Song Tap"; camera when the listener first picks "Scan a code instead" and taps Allow camera | Bluetooth asked by the "Turn on Song Tap" button; camera the same |
+| Bluetooth wire (milestone 2) | `SongTapWire` (PixlCore): the same two service UUIDs, four characteristics and message bytes as Android's `SongTapWire`; `wire.jsonl` replayed bit for bit | `SongTapWire` (`:songtap`, spec version 2) |
+| Bluetooth route | `SongTapBleRoute` (PixlCore, a port of `BleTransport` over `SongTapBleRadio` / `SongTapImpulseSource` / `SongTapClock` / `SongTapBleScheduler`; 33 tests over fakes) | `BleTransport` + `BleRadio` |
+| Radio | `SongTapBluetoothRadio` (app): `CBPeripheralManager` (advertise one service UUID, the sender's GATT server, long reads signed once) and `CBCentralManager` (scan both UUIDs with duplicates, one connection to the sender, one operation at a time); main queue; made only while armed | `AndroidBleRadio` |
+| Tap sensor | `SongTapMotionSource` (CoreMotion accelerometer, 50 Hz, only while armed) feeding the core's `SongTapImpulse`; the detector is the core's, fed with the scan's RSSI | `SensorImpulseSource` |
+| Beam | `SongTapBeam.swift`: `TimelineView` (paused unless a beam plays) over the core's `SongTapTimeline`; sender artwork lifts, shrinks and flies off the top; receiver card in one `GlassEffectContainer` with the Undo chip (`glassEffectID`, matched geometry); top-edge glow (one radial gradient); Reduce Motion = 150 ms cross-fade, haptics stay | `SongTapBeam.kt` (graphicsLayer, one `Animatable`) |
+| Diagnostics | Settings › Song Tap › Song Tap diagnostics (Developer mode): `SongTapDiagnosticsView` + `SongTapDiagnostics` (PixlCore): live signal, baseline, jump, jerk, detector state, last 20 events, Mark buttons, Copy log | `SongTapDiagnosticsScreen` |
+| Not built | Nearby Interaction / UWB (a later stage; the transport interface is ready) | same |
+
+## Song Drop and the tap fixes (2026-11-21, branch `song-drop`, from `song-tap`; Android spec 6)
+
+The owner's five asks (a tap that commits at the first haptic, "it can find phones too easily", names with a "Song drop to X?" yes / no and a
+Song Drop button next to Share, one phone's tap telling the other, and "a lot more sensitive"), ported item for item from Android's branch
+`song-drop` (`handoff/2026-11-21-song-drop.md`, the main section and the Follow-up). The iPhone is the REFERENCE signal scale: its
+readings go to the core as they are (offset 0), and NORMAL is its own tuning unchanged. Notes: `docs/handoff/2026-11-21-song-drop.md`.
+
+| Part | iOS | Android |
+|---|---|---|
+| Spec and goldens | `SongTapSpec.version` = 6; Android's whole `songtap-golden/` copied byte for byte into `Fixtures/songtap` (21 files incl. `names`, `nearby`, `peertap`; the manifest hashes are checked) | `songtap-golden/`, `SPEC_VERSION` 6 |
+| Sensitivity | `SongTapSensitivity` (PixlCore): NORMAL = the iPhone numbers (jump 15 dB, hold 150, dwell 400, jerk 1800 milli g, cooldown 2000), HIGH = the default (9 dB, 60, 200, 900, 1200); the detector and the jerk detector take the profile | `SongTapSensitivity` |
+| Gates | near -70/-78, list -85/-92, hold -45 dBm for 250 ms, re-armed below -55, peer jerk counts above -55, all on the iPhone scale as they are | the same numbers on the normalised scale (Pixel offset -15) |
+| Names | `SongTapNames` (clean, advertName, fromAdvert), `SongTapWire` name characteristic `...9c15` and the 0xFFFF advertisement block; Settings › Song Tap › Your name (default the device name, "iPhone" if empty) | `SongTapNames`, `SongTapSettings.name` |
+| Nearby list | `SongTapNearbyBook` (listed with hysteresis, stale 4 s, one row per phone, strongest first, "No" silences a phone 60 s) feeding `ui.nearby` and `ui.prompt`; "Phones nearby" on the Song Tap screen | `NearbyBook` |
+| Prefetch and commit | the session holds the offer before the tap (`offerPrefetched`, `pre`), the tap is the commit (haptic, save, beam in one reduction), no read, ack or go, `GO_DELAY_MS` 0; offer-ready `0x02` and offer-withdrawn `0x03` events | `SongTapSession`, `BleTransport` |
+| One-sided tap | event `0x04` (sender to receiver notification) and Control `04 aa aa aa aa` (receiver to sender), `SongTapPeerTap.judge` (followed, said yes, signal at least -70, 1200 ms gap), no echo | `SongTapPeerTap` |
+| Song Drop entry | a round tertiary glass button right of Share in the song options sheet, "Song Drop" in the player's ⋯ menu and in the long-press quick actions; all call `SongDrop.start` (the picked song, not the playing one, is offered) and open the Song Tap cover on Send | the round button in `SongInfoBottomSheet`, `SongDropViewModel` |
+| Prompt and armed card | "Song drop to X?" alert (Yes / No, No ignores that phone 60 s), then "Tap phones together to share" with "Sharing with X" and Cancel; "From X" on the receiver's cards | `SongDropDialog`, `ArmedCard` |
+| Settings | Your name (alert with a field, 20 scalars, "Use my phone's name"), Sensitivity (Normal / High, live) | `SettingsSongTap` |
+| Diagnostics | the gates, the active gate, the profile and thresholds, the hold level, the offset 0 note, offer in hand, names, the peer-tap verdict | `SongTapDiagnosticsScreen` |
+| Radio | the local name carries the short name (iOS may cut it), the Name characteristic, Android's manufacturer block read from `CBAdvertisementDataManufacturerDataKey`, `notify(client:value:)` for events; no way to set the advertising power | LOW advertising power, scan response block |
+| Not built (Android only) | the Pixel's RSSI offset and its 2 s Calibrate button (the iPhone is the reference) | `RssiCalibration` |

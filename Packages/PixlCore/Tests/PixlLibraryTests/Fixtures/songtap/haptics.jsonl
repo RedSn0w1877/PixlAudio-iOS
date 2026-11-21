@@ -1,0 +1,4 @@
+{"fn":"cues","in":{"role":"send","reduced":false},"out":{"cues":["180:confirm","1100:success"]}}
+{"fn":"cues","in":{"role":"send","reduced":true},"out":{"cues":["0:success"]}}
+{"fn":"cues","in":{"role":"receive","reduced":false},"out":{"cues":["420:confirm","900:success"]}}
+{"fn":"cues","in":{"role":"receive","reduced":true},"out":{"cues":["0:success"]}}

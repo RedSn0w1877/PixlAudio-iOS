@@ -61,11 +61,11 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The everyday rows, top to bottom: Accounts, Appearance, Playback, Equalizer, Lyrics, Sing, Gestures & haptics,
+    /// The everyday rows, top to bottom: Accounts, Appearance, Playback, Equalizer, Lyrics, Sing, Song Tap, Gestures & haptics,
     /// Library & storage, AI features, Backup & Restore, About.
     static let everyday: [SettingsMainEntry] = [
         .accounts, .category(.appearance), .category(.playback), .category(.equalizer), .category(.lyrics),
-        .category(.sing), .category(.behavior), .category(.library), .category(.ai), .category(.endless), .category(.backupRestore),
+        .category(.sing), .category(.songTap), .category(.behavior), .category(.library), .category(.ai), .category(.endless), .category(.backupRestore),
         .category(.about),
     ]
 
@@ -89,6 +89,7 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .equalizer: "waveform"
             case .lyrics: "quote.bubble.fill"
             case .sing: "music.mic"
+            case .songTap: "iphone.radiowaves.left.and.right"
             case .behavior: "hand.tap"
             case .ai: "sparkles"
             case .endless: "infinity"
@@ -111,6 +112,7 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
             case .playback: return dark ? (0xFF633B48, 0xFFFFD8EC) : (0xFFFFD8EC, 0xFF631B4B)
             case .lyrics: return dark ? (0xFF4A4458, 0xFFE8DEF8) : (0xFFE8DEF8, 0xFF1D192B)
             case .sing: return dark ? (0xFF5E3A22, 0xFFFFDBC9) : (0xFFFFDBC9, 0xFF3A1900)
+            case .songTap: return dark ? (0xFF3A4A5E, 0xFFD6E4FF) : (0xFFD6E4FF, 0xFF0F2B4A)
             case .behavior: return dark ? (0xFF3E4C63, 0xFFD7E3FF) : (0xFFD7E3FF, 0xFF253347)
             case .ai: return dark ? (0xFF004F58, 0xFF88FAFF) : (0xFFCCE8EA, 0xFF004F58)
             case .endless: return dark ? (0xFF1F4D45, 0xFFBFF2E6) : (0xFFBFF2E6, 0xFF00201B)
@@ -150,6 +152,7 @@ extension SettingsCategory {
         case .equalizer: L10n.settingsCategoryEqualizerTitle
         case .lyrics: L10n.settingsMainLyricsTitle
         case .sing: L10n.settingsMainSingTitle
+        case .songTap: SongTapStrings.settingsTitle
         case .behavior: L10n.settingsMainBehaviorTitle
         case .ai: L10n.settingsCategoryAiTitle
         case .endless: EndlessStrings.settingsTitle
@@ -168,6 +171,7 @@ extension SettingsCategory {
         case .equalizer: L10n.settingsMainEqualizerSubtitle
         case .lyrics: L10n.settingsMainLyricsSubtitle
         case .sing: L10n.settingsMainSingSubtitle
+        case .songTap: SongTapStrings.settingsSubtitle
         case .behavior: L10n.settingsMainBehaviorSubtitle
         case .ai: L10n.settingsMainAiSubtitle
         case .endless: EndlessStrings.settingsSubtitle
@@ -277,6 +281,7 @@ struct SettingsCategoryContent: View {
         case .playback: PlaybackSettingsSection()
         case .lyrics: LyricsSettingsSection()
         case .sing: SingSettingsSection()
+        case .songTap: SongTapSettingsSection()
         case .behavior: BehaviorSettingsSection()
         case .ai: AISettingsSection()
         case .endless: EndlessSettingsSection()

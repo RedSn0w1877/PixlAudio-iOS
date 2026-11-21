@@ -1,0 +1,11 @@
+{"fn":"constants","in":{},"out":{"goDelay":"0","maxRtt":"1000"}}
+{"fn":"impulseAge","in":{"now":"1000","impulse":"900"},"out":{"ms":"100"}}
+{"fn":"impulseAge","in":{"now":"1000","impulse":"1000"},"out":{"ms":"0"}}
+{"fn":"impulseAge","in":{"now":"1000","impulse":"1001"},"out":{"ms":"-1"}}
+{"fn":"impulseAge","in":{"now":"1000","impulse":"-1"},"out":{"ms":"-1"}}
+{"fn":"impulseAge","in":{"now":"1000","impulse":"0"},"out":{"ms":"1000"}}
+{"fn":"peerImpulse","in":{"receipt":"10000","age":"100","rtt":"40"},"out":{"ms":"9880"}}
+{"fn":"peerImpulse","in":{"receipt":"10000","age":"0","rtt":"0"},"out":{"ms":"10000"}}
+{"fn":"peerImpulse","in":{"receipt":"10000","age":"-1","rtt":"40"},"out":{"ms":"-1"}}
+{"fn":"peerImpulse","in":{"receipt":"10000","age":"500","rtt":"5000"},"out":{"ms":"9000"}}
+{"fn":"peerImpulse","in":{"receipt":"10000","age":"250","rtt":"81"},"out":{"ms":"9710"}}

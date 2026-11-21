@@ -21,7 +21,7 @@ final class SettingsFeatureTests: XCTestCase {
     /// mode (under its switch, the list's last group).
     func testMainListOrderMatchesAndroid() {
         let everyday = [
-            "accounts", "appearance", "playback", "equalizer", "lyrics", "sing", "behavior", "library", "ai",
+            "accounts", "appearance", "playback", "equalizer", "lyrics", "sing", "song_tap", "behavior", "library", "ai",
             "endless", "backup_restore", "about",
         ]
         XCTAssertEqual(SettingsMainEntry.ordered(developerMode: false).map(\.id), everyday)

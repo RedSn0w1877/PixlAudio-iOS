@@ -263,14 +263,16 @@ struct LibraryEditor {
     /// file is deleted from Documents or its folder; songs without a file of their own (music-library items, Spotify)
     /// — and files that couldn't be deleted — are remembered in `HiddenSongs`, so the next scan doesn't bring them
     /// back. UI tests only drop the rows.
-    func removeSongs(_ songIds: [String]) {
+    /// `remember: false` does not put the ids in `HiddenSongs` (Song Tap's Undo of a song it added a moment ago: the id must
+    /// stay free to be saved again).
+    func removeSongs(_ songIds: [String], remember: Bool = true) {
         let set = Set(songIds)
         var snapshot = store.snapshot
         let removed = snapshot.songs.filter { set.contains($0.id) }
         snapshot.songs.removeAll { set.contains($0.id) }
         for index in snapshot.playlists.indices { snapshot.playlists[index].songIds.removeAll { set.contains($0) } }
         commit(snapshot, removedSongIds: set) { try await $0.deleteSongs(songIds) }
-        guard writesCache else { return }
+        guard writesCache, remember else { return }
         let files = removed.filter(SongFileRemoval.deletesFile)
         let fileIds = Set(files.map(\.id))
         // Only what was in the library is remembered as hidden: "Remove" on a track from outside it (an Autoplay pick

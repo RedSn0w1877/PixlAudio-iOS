@@ -100,6 +100,10 @@ targets:
           - io.github.redsn0w1877.pixlaudio.cloud-processing
           - io.github.redsn0w1877.pixlaudio.brain-refresh
         NSLocalNetworkUsageDescription: PixlAudio connects to AI servers you run on your local network.
+        # Song Tap: the camera reads another phone's code; Bluetooth finds a phone nearby (milestone 2). Both are asked for
+        # only when the listener first uses that part of Song Tap. No entitlements: neither needs one.
+        NSCameraUsageDescription: PixlAudio uses the camera to read a Song Tap code from another phone.
+        NSBluetoothAlwaysUsageDescription: PixlAudio uses Bluetooth to find a phone nearby for Song Tap.
         # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
         # (developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity).
         # User-typed AI endpoints (LAN Ollama etc.) may be plain HTTP; built-in endpoints are HTTPS.

@@ -59,6 +59,8 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
     /// Lyrics and Sing (2026-10-22 settings reorganisation): categories of their own, on Android too.
     case lyrics = "lyrics"
     case sing = "sing"
+    /// Song Tap (2026-11-20): send the song that is playing to a phone nearby; its own category, after Sing, on Android too.
+    case songTap = "song_tap"
     case behavior = "behavior"
     case ai = "ai"
     /// Endless Listening's own small category (host notes, how it works): shown without developer mode.
@@ -80,6 +82,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .equalizer: "Equalizer"
         case .lyrics: "Lyrics"
         case .sing: "Sing"
+        case .songTap: "Song Tap"
         case .behavior: "Gestures & haptics"
         case .ai: "AI features"
         case .endless: "Endless Listening"
@@ -99,6 +102,7 @@ nonisolated enum SettingsCategory: String, Hashable, Sendable, CaseIterable, Ide
         case .equalizer: "waveform"
         case .lyrics: "quote.bubble"
         case .sing: "music.mic"
+        case .songTap: "iphone.radiowaves.left.and.right"
         case .behavior: "hand.tap"
         case .ai: "sparkles"
         case .endless: "infinity"
@@ -164,6 +168,8 @@ nonisolated enum AppRoute: Hashable, Sendable {
     /// Cloud Studio (iOS-first, design §7.2): Settings › Sing › Cloud processing, and its queue.
     case cloudProcessing
     case cloudQueue
+    /// Song Tap diagnostics (Developer mode, Settings › Song Tap): the live numbers behind the tap detector.
+    case songTapDiagnostics
 
     // Accounts
     case accounts
@@ -214,6 +220,7 @@ nonisolated enum AppRoute: Hashable, Sendable {
         case .genrePage: "genrePage"
         case .cloudProcessing: "cloudProcessing"
         case .cloudQueue: "cloudQueue"
+        case .songTapDiagnostics: "songTapDiagnostics"
         case .accounts: "accounts"
         case .spotifyDashboard: "spotifyDashboard"
         case .spotifyBrowse: "spotifyBrowse"
@@ -294,6 +301,8 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case backupExport
     /// Endless Listening's three-page introduction (first open of its card, the card's menu, Settings).
     case endlessIntro
+    /// Song Tap (2026-11-20, Android `Screen.SongTap`): send the song that is playing to a phone nearby, or take one.
+    case songTap
 
     var id: String {
         switch self {
@@ -306,6 +315,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .backupImport: "backupImport"
         case .backupExport: "backupExport"
         case .endlessIntro: "endlessIntro"
+        case .songTap: "songTap"
         }
     }
 }

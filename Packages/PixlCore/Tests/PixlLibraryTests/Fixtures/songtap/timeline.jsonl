@@ -1,0 +1,181 @@
+{"fn":"ease","in":{"x":0},"out":{"outCubic":0,"inCubic":0,"smooth":0,"outBack":0}}
+{"fn":"ease","in":{"x":25},"out":{"outCubic":74,"inCubic":0,"smooth":1,"outBack":113}}
+{"fn":"ease","in":{"x":50},"out":{"outCubic":143,"inCubic":0,"smooth":7,"outBack":220}}
+{"fn":"ease","in":{"x":75},"out":{"outCubic":209,"inCubic":0,"smooth":16,"outBack":318}}
+{"fn":"ease","in":{"x":100},"out":{"outCubic":271,"inCubic":1,"smooth":28,"outBack":409}}
+{"fn":"ease","in":{"x":125},"out":{"outCubic":331,"inCubic":1,"smooth":42,"outBack":493}}
+{"fn":"ease","in":{"x":150},"out":{"outCubic":386,"inCubic":3,"smooth":60,"outBack":570}}
+{"fn":"ease","in":{"x":175},"out":{"outCubic":439,"inCubic":5,"smooth":81,"outBack":641}}
+{"fn":"ease","in":{"x":200},"out":{"outCubic":488,"inCubic":8,"smooth":104,"outBack":706}}
+{"fn":"ease","in":{"x":225},"out":{"outCubic":535,"inCubic":11,"smooth":129,"outBack":765}}
+{"fn":"ease","in":{"x":250},"out":{"outCubic":579,"inCubic":15,"smooth":156,"outBack":818}}
+{"fn":"ease","in":{"x":275},"out":{"outCubic":619,"inCubic":20,"smooth":185,"outBack":865}}
+{"fn":"ease","in":{"x":300},"out":{"outCubic":657,"inCubic":27,"smooth":216,"outBack":907}}
+{"fn":"ease","in":{"x":325},"out":{"outCubic":693,"inCubic":34,"smooth":248,"outBack":945}}
+{"fn":"ease","in":{"x":350},"out":{"outCubic":726,"inCubic":42,"smooth":281,"outBack":977}}
+{"fn":"ease","in":{"x":375},"out":{"outCubic":756,"inCubic":52,"smooth":316,"outBack":1005}}
+{"fn":"ease","in":{"x":400},"out":{"outCubic":784,"inCubic":64,"smooth":352,"outBack":1029}}
+{"fn":"ease","in":{"x":425},"out":{"outCubic":810,"inCubic":76,"smooth":388,"outBack":1049}}
+{"fn":"ease","in":{"x":450},"out":{"outCubic":834,"inCubic":91,"smooth":425,"outBack":1065}}
+{"fn":"ease","in":{"x":475},"out":{"outCubic":856,"inCubic":107,"smooth":462,"outBack":1079}}
+{"fn":"ease","in":{"x":500},"out":{"outCubic":875,"inCubic":125,"smooth":500,"outBack":1088}}
+{"fn":"ease","in":{"x":525},"out":{"outCubic":893,"inCubic":144,"smooth":537,"outBack":1095}}
+{"fn":"ease","in":{"x":550},"out":{"outCubic":909,"inCubic":166,"smooth":574,"outBack":1098}}
+{"fn":"ease","in":{"x":575},"out":{"outCubic":924,"inCubic":190,"smooth":611,"outBack":1100}}
+{"fn":"ease","in":{"x":600},"out":{"outCubic":936,"inCubic":216,"smooth":648,"outBack":1100}}
+{"fn":"ease","in":{"x":625},"out":{"outCubic":948,"inCubic":244,"smooth":683,"outBack":1097}}
+{"fn":"ease","in":{"x":650},"out":{"outCubic":958,"inCubic":274,"smooth":718,"outBack":1093}}
+{"fn":"ease","in":{"x":675},"out":{"outCubic":966,"inCubic":307,"smooth":751,"outBack":1087}}
+{"fn":"ease","in":{"x":700},"out":{"outCubic":973,"inCubic":343,"smooth":784,"outBack":1081}}
+{"fn":"ease","in":{"x":725},"out":{"outCubic":980,"inCubic":381,"smooth":814,"outBack":1072}}
+{"fn":"ease","in":{"x":750},"out":{"outCubic":985,"inCubic":421,"smooth":843,"outBack":1064}}
+{"fn":"ease","in":{"x":775},"out":{"outCubic":989,"inCubic":465,"smooth":870,"outBack":1056}}
+{"fn":"ease","in":{"x":800},"out":{"outCubic":992,"inCubic":512,"smooth":896,"outBack":1047}}
+{"fn":"ease","in":{"x":825},"out":{"outCubic":995,"inCubic":561,"smooth":918,"outBack":1038}}
+{"fn":"ease","in":{"x":850},"out":{"outCubic":997,"inCubic":614,"smooth":939,"outBack":1029}}
+{"fn":"ease","in":{"x":875},"out":{"outCubic":999,"inCubic":669,"smooth":957,"outBack":1021}}
+{"fn":"ease","in":{"x":900},"out":{"outCubic":999,"inCubic":729,"smooth":972,"outBack":1015}}
+{"fn":"ease","in":{"x":925},"out":{"outCubic":1000,"inCubic":791,"smooth":983,"outBack":1008}}
+{"fn":"ease","in":{"x":950},"out":{"outCubic":1000,"inCubic":857,"smooth":992,"outBack":1004}}
+{"fn":"ease","in":{"x":975},"out":{"outCubic":1000,"inCubic":926,"smooth":998,"outBack":1001}}
+{"fn":"ease","in":{"x":1000},"out":{"outCubic":1000,"inCubic":1000,"smooth":1000,"outBack":1000}}
+{"fn":"frame","in":{"role":"send","t":"-100","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"0","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"100","reduced":false},"out":{"frame":"glow=481 scale=928 ty=0 alpha=1000 shadow=912 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"200","reduced":false},"out":{"frame":"glow=498 scale=917 ty=0 alpha=1000 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"300","reduced":false},"out":{"frame":"glow=477 scale=818 ty=-25 alpha=1000 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"400","reduced":false},"out":{"frame":"glow=440 scale=643 ty=-157 alpha=994 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"500","reduced":false},"out":{"frame":"glow=390 scale=476 ty=-484 alpha=466 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"600","reduced":false},"out":{"frame":"glow=331 scale=400 ty=-1100 alpha=0 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"700","reduced":false},"out":{"frame":"glow=267 scale=400 ty=-1100 alpha=0 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"800","reduced":false},"out":{"frame":"glow=202 scale=400 ty=-1100 alpha=0 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"900","reduced":false},"out":{"frame":"glow=140 scale=400 ty=-1100 alpha=0 shadow=1000 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1000","reduced":false},"out":{"frame":"glow=85 scale=940 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1100","reduced":false},"out":{"frame":"glow=41 scale=969 ty=0 alpha=488 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1200","reduced":false},"out":{"frame":"glow=11 scale=987 ty=0 alpha=784 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1300","reduced":false},"out":{"frame":"glow=0 scale=996 ty=0 alpha=936 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1400","reduced":false},"out":{"frame":"glow=0 scale=999 ty=0 alpha=992 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1500","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1600","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1700","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1800","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1900","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"2000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"2500","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"6000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"6900","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7050","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7100","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7150","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7200","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7250","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7300","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7400","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"8000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"-100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"0","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"600","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"700","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"800","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1600","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1700","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1800","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"1900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"2000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"2500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"6000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"6900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7050","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7150","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7250","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"7400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"send","t":"8000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"-100","reduced":false},"out":{"frame":"glow=0 scale=400 ty=-1100 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"0","reduced":false},"out":{"frame":"glow=0 scale=400 ty=-1100 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"100","reduced":false},"out":{"frame":"glow=481 scale=400 ty=-487 alpha=963 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"200","reduced":false},"out":{"frame":"glow=498 scale=400 ty=-158 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"300","reduced":false},"out":{"frame":"glow=477 scale=400 ty=-26 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"400","reduced":false},"out":{"frame":"glow=440 scale=400 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"500","reduced":false},"out":{"frame":"glow=390 scale=769 ty=0 alpha=1000 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"600","reduced":false},"out":{"frame":"glow=331 scale=1003 ty=0 alpha=1000 shadow=0 card=258 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"700","reduced":false},"out":{"frame":"glow=267 scale=1060 ty=0 alpha=1000 shadow=0 card=739 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"800","reduced":false},"out":{"frame":"glow=202 scale=1030 ty=0 alpha=1000 shadow=0 card=1000 text=258 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"900","reduced":false},"out":{"frame":"glow=140 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=739 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"1000","reduced":false},"out":{"frame":"glow=85 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"1100","reduced":false},"out":{"frame":"glow=41 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=352"}}
+{"fn":"frame","in":{"role":"receive","t":"1200","reduced":false},"out":{"frame":"glow=11 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=896"}}
+{"fn":"frame","in":{"role":"receive","t":"1300","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1400","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1500","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1600","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1700","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1800","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1900","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"2000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"2500","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"6000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"6900","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"7000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"7050","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-4 alpha=927 shadow=0 card=927 text=927 undo=927"}}
+{"fn":"frame","in":{"role":"receive","t":"7100","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-39 alpha=742 shadow=0 card=742 text=742 undo=742"}}
+{"fn":"frame","in":{"role":"receive","t":"7150","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-137 alpha=500 shadow=0 card=500 text=500 undo=500"}}
+{"fn":"frame","in":{"role":"receive","t":"7200","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-324 alpha=261 shadow=0 card=261 text=261 undo=261"}}
+{"fn":"frame","in":{"role":"receive","t":"7250","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-635 alpha=75 shadow=0 card=75 text=75 undo=75"}}
+{"fn":"frame","in":{"role":"receive","t":"7300","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-1100 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7400","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-1100 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"8000","reduced":false},"out":{"frame":"glow=0 scale=1000 ty=-1100 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"-100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"0","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=963 shadow=0 card=963 text=963 undo=963"}}
+{"fn":"frame","in":{"role":"receive","t":"200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"600","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"700","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"800","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1600","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1700","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1800","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"1900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"2000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"2500","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"6000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=1000 shadow=0 card=1000 text=1000 undo=1000"}}
+{"fn":"frame","in":{"role":"receive","t":"6900","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7050","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7100","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7150","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7200","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7250","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7300","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"7400","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"frame","in":{"role":"receive","t":"8000","reduced":true},"out":{"frame":"glow=0 scale=1000 ty=0 alpha=0 shadow=0 card=0 text=0 undo=0"}}
+{"fn":"total","in":{"role":"send","reduced":false},"out":{"ms":"1500"}}
+{"fn":"total","in":{"role":"send","reduced":true},"out":{"ms":"150"}}
+{"fn":"total","in":{"role":"receive","reduced":false},"out":{"ms":"7300"}}
+{"fn":"total","in":{"role":"receive","reduced":true},"out":{"ms":"6300"}}
