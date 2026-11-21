@@ -104,30 +104,70 @@ struct SongTapPurityTests {
         return false
     }
 
-    @Test func noBannedImportOrCallInTheSongTapSources() throws {
-        let folder = URL(fileURLWithPath: #filePath)
+    /// The ring code's image side (`ring/image`: style, renderer, scanner) measures pixels and needs floating point and Foundation's
+    /// maths; it is checked by round trips, not by golden vectors (the Android `PurityTest`'s `floatingPointOk`). Everything else
+    /// in the core, the ring code's layout, Reed-Solomon, payload and timeline included, stays integer only.
+    private let imageSideOk: Set<String> = [
+        "import Foundation", "Double", "Float", "CGFloat", "sqrt(", "squareRoot(", ".rounded(", "pow(", "exp(", "log(",
+    ]
+
+    private func isImageSide(_ path: String) -> Bool { path.replacingOccurrences(of: "\\", with: "/").contains("/ring/image/") }
+
+    /// Every .swift file under the Song Tap folder (the ring code lives in `ring/` and `ring/image/`), as full paths.
+    private func swiftFiles(under folder: URL) throws -> [String] {
+        var out: [String] = []
+        for entry in try FileManager.default.contentsOfDirectory(atPath: folder.path) {
+            let url = folder.appendingPathComponent(entry)
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+            if isDirectory.boolValue { out += try swiftFiles(under: url) } else if entry.hasSuffix(".swift") { out.append(url.path) }
+        }
+        return out.sorted()
+    }
+
+    private var songTapFolder: URL {
+        URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/PixlLibrary/SongTap", isDirectory: true)
-        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".swift") }
-        #expect(names.count >= 10, "expected the whole core at \(folder.path), found \(names.count) files")
+    }
+
+    @Test func noBannedImportOrCallInTheSongTapSources() throws {
+        let paths = try swiftFiles(under: songTapFolder)
+        #expect(paths.count >= 10, "expected the whole core at \(songTapFolder.path), found \(paths.count) files")
         var violations: [String] = []
-        for name in names {
-            let source = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
+        for path in paths {
+            let source = try String(contentsOfFile: path, encoding: .utf8)
             let code = codeOnly(source)
+            let name = (path as NSString).lastPathComponent
             for rule in banned where contains(code, rule.needle, wholeWord: rule.wholeWord) {
+                if isImageSide(path) && imageSideOk.contains(rule.needle) { continue }
                 violations.append("\(name): `\(rule.needle)` (\(rule.why))")
             }
         }
         #expect(violations.isEmpty, "\(violations.joined(separator: "\n"))")
     }
 
+    @Test func theImageSideIsTheOnlyPlaceFloatingPointMayLive() throws {
+        let paths = try swiftFiles(under: songTapFolder)
+        let ringStrict = paths.filter { $0.replacingOccurrences(of: "\\", with: "/").contains("/ring/") && !isImageSide($0) }
+        #expect(ringStrict.count >= 5, "the strict ring files: \(ringStrict.map { ($0 as NSString).lastPathComponent })")
+        let image = paths.filter { isImageSide($0) }
+        #expect(image.count >= 3, "the image side files: \(image.map { ($0 as NSString).lastPathComponent })")
+        for path in ringStrict {
+            let code = codeOnly(try String(contentsOfFile: path, encoding: .utf8))
+            for needle in imageSideOk { #expect(!contains(code, needle, wholeWord: needle != "import Foundation"), "\((path as NSString).lastPathComponent) uses `\(needle)`") }
+        }
+    }
+
     @Test func theCoreHasTheSameFileNamesAsAndroid() throws {
         let folder = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/PixlLibrary/SongTap", isDirectory: true)
-        let names = Set(try FileManager.default.contentsOfDirectory(atPath: folder.path))
+        let names = Set(try swiftFiles(under: folder).map { ($0 as NSString).lastPathComponent })
         for expected in ["SongTapText", "SongTapPayload", "SongTapLink", "SongTapSigning", "SongTapSession", "SongTapRateLimits",
-                         "SongTapDetector", "SongTapTimeline", "SongTapHandshake"] {
+                         "SongTapDetector", "SongTapTimeline", "SongTapHandshake",
+                         "RingCodeLayout", "Gf256", "ReedSolomon", "RingCodePayload", "RingCodeTimeline",
+                         "RingCodeRenderer", "RingCodeStyle", "RingScanner"] {
             #expect(names.contains("\(expected).swift"), "\(expected).swift is missing")
         }
     }

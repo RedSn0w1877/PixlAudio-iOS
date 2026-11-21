@@ -9,3 +9,4 @@
 *.pxbpe binary
 *.enc binary
 *.gz binary
+*.pgm binary
