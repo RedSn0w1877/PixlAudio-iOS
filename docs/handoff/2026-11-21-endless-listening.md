@@ -239,3 +239,8 @@ play, only played songs; `Ask the host: chips apply to this listening only` (put
 Everything about sound (the voice, the duck against a crossfade, the tap's lead and so the real lag of the duck, whether `CXCallObserver` sees a call on another
 route), the Home card after Stop and the "already playing" notice, the card's tint and long-press menu, the chips' real counts on a thin pool, that the
 version 2 plan rebuilds once on the first Home after the update, and the look of the host cards. `App/` changes compile only on CI.
+
+## CI (review fixes)
+
+- Round 1, run 44919087234 (on `c07c655`): core and app both green on the first try (`App/` compiled, the unit tests incl. the new `StationStore` case passed); the ipa job is skipped on a push.
+- Locally: the whole `Packages/PixlCore` suite passed (2784 tests over its test targets, `PixlLibraryTests` 1038, no failure, no timeout), `ci/check-forbidden.sh` and `ci/parse-check.ps1` OK.
