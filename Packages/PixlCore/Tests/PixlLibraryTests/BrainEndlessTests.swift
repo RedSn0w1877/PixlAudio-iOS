@@ -60,6 +60,43 @@ struct BrainEndlessTests {
                     }
                     $0.endArray()
                 })
+            case "notes_since":
+                let slots = G.array(i, "slots").map { v -> HostNotes.Slot in
+                    let a = v.arrayValue ?? []
+                    return HostNotes.Slot(artist: a[0].stringValue ?? "", genre: a[1].stringValue ?? "", genreFact: a[2].stringValue ?? "",
+                                          year: Int(a[3].bareLong ?? 0), island: a[4].stringValue ?? "",
+                                          newFromPlayedArtist: (a[5].bareLong ?? 0) == 1, sideways: (a[6].bareLong ?? 0) == 1)
+                }
+                let since = Int(i["since"]?.bareLong ?? 0)
+                let notes = HostNotes.notes(slots, taken: [], sinceLast: since)
+                report.record(c, c.matches {
+                    $0.beginArray("notes")
+                    for x in notes {
+                        $0.beginArray(); $0.intItem(x.index); $0.intItem(x.kind); $0.stringItem(x.a); $0.stringItem(x.b)
+                        $0.stringItem(HostNotes.text(x)); $0.endArray()
+                    }
+                    $0.endArray()
+                })
+            case "since_note":
+                let ids = G.array(i, "ids").map { $0.stringValue ?? "" }
+                let noted = Set(G.array(i, "noted").map { $0.stringValue ?? "" })
+                let index = Int(i["index"]?.bareLong ?? 0)
+                let since = HostNotes.tracksSinceNote(ids, index: index, noted: noted)
+                report.record(c, c.matches { $0.int("since", since) })
+            case "note_names":
+                let a = G.array(i, "slot")
+                let slot = HostNotes.Slot(artist: a[0].stringValue ?? "", genre: a[1].stringValue ?? "", genreFact: a[2].stringValue ?? "",
+                                          year: Int(a[3].bareLong ?? 0), island: a[4].stringValue ?? "",
+                                          newFromPlayedArtist: (a[5].bareLong ?? 0) == 1, sideways: (a[6].bareLong ?? 0) == 1)
+                let notes = HostNotes.notes([slot])
+                report.record(c, c.matches {
+                    $0.beginArray("notes")
+                    for x in notes {
+                        $0.beginArray(); $0.intItem(x.index); $0.intItem(x.kind); $0.stringItem(x.a); $0.stringItem(x.b)
+                        $0.stringItem(HostNotes.text(x)); $0.endArray()
+                    }
+                    $0.endArray()
+                })
             case "fact":
                 let f = HostNotes.factOf(G.string(i, "raw"))
                 report.record(c, c.matches { $0.string("fact", f) })
@@ -69,11 +106,14 @@ struct BrainEndlessTests {
             default: report.record(c, false)
             }
         }
-        report.verify(atLeast: 140)
+        report.verify(atLeast: 190)
         #expect(counts["seeds"] == 60)
         #expect(counts["notes"] == 70)
         #expect(counts["fact"] == 9)
         #expect(counts["speakable"] == 8)
+        #expect(counts["notes_since"] == 30)
+        #expect(counts["since_note"] == 20)
+        #expect(counts["note_names"] == 7)
     }
 
     @Test func theEndlessFileIsInTheManifest() throws {
@@ -171,13 +211,72 @@ struct BrainEndlessTests {
         #expect(notes.map(\.index) == [0, 10, 15, 20])
     }
 
-    @Test func aStepSidewaysNamesTheGenreItComesFromAndNeedsOne() {
-        let slots = [slot(genre: "Hip hop"), slot(genre: "Hip hop"), slot(genre: "Bedroom pop", side: true)]
-        #expect(HostNotes.notes(Array(slots.prefix(2)) + [slot(genre: "Hip hop", side: true)]).isEmpty)
-        let notes = HostNotes.notes([slots[0], slots[1], slot(genre: "Bedroom pop", island: "", side: true)])
-        #expect(notes.count == 1)
-        #expect(HostNotes.text(notes[0]) == "A step sideways, from Hip hop to Bedroom pop.")
-        #expect(notes[0].index == 2)
+    @Test func aStepSidewaysNamesOnlyTheGenreTheEngineFlaggedWithNoFromGenre() {
+        // The engine computed one thing: this pick is from a genre next to the listener's own. No earlier track is needed and none is named.
+        let alone = HostNotes.notes([slot(genre: "Bossa nova", side: true)])
+        #expect(alone.count == 1)
+        #expect(HostNotes.text(alone[0]) == "A step sideways: Bossa nova.")
+        #expect(alone[0].index == 0)
+        let after = HostNotes.notes([slot(genre: "K-pop"), slot(genre: "K-pop"), slot(genre: "Bossa nova", side: true)])
+        #expect(after.map { HostNotes.text($0) } == ["A step sideways: Bossa nova."])
+        #expect(after[0].index == 2)
+        // No genre, no note.
+        #expect(HostNotes.notes([slot(side: true)]).isEmpty)
+    }
+
+    @Test func theLastNotesDistanceKeepsTheCadenceAcrossWindows() {
+        let all = (0..<20).map { slot(year: 2000 + $0) }
+        // Nothing before: the current track has a note, then every fifth.
+        #expect(HostNotes.notes(all).map(\.index) == [0, 5, 10, 15])
+        // A note one track ago: the window starts four tracks later, the same absolute tracks as before.
+        #expect(HostNotes.notes(all, sinceLast: 1).map(\.index) == [4, 9, 14, 19])
+        #expect(HostNotes.notes(all, sinceLast: 3).map(\.index) == [2, 7, 12, 17])
+        // Four tracks ago: the current track is free again; five or more is the same as none.
+        #expect(HostNotes.notes(all, sinceLast: 4).map(\.index) == [1, 6, 11, 16])
+        #expect(HostNotes.notes(all, sinceLast: 5).map(\.index) == HostNotes.notes(all).map(\.index))
+        #expect(HostNotes.notes(all, sinceLast: 99).map(\.index) == HostNotes.notes(all).map(\.index))
+    }
+
+    @Test func tracksSinceANoteLooksOnlyAtTheFourTracksBeforeAndOnlyAtSongsThatHadOne() {
+        let ids = ["a", "b", "c", "d", "e", "f", "g"]
+        #expect(HostNotes.tracksSinceNote(ids, index: 4, noted: []) == HostNotes.minGap)
+        #expect(HostNotes.tracksSinceNote(ids, index: 4, noted: ["d"]) == 1)
+        #expect(HostNotes.tracksSinceNote(ids, index: 4, noted: ["b", "a"]) == 3)
+        // The nearest one wins; five tracks back is out of reach; the song itself does not count.
+        #expect(HostNotes.tracksSinceNote(ids, index: 4, noted: ["b", "c", "a"]) == 2)
+        #expect(HostNotes.tracksSinceNote(ids, index: 5, noted: ["a"]) == HostNotes.minGap)
+        #expect(HostNotes.tracksSinceNote(ids, index: 4, noted: ["e"]) == HostNotes.minGap)
+        #expect(HostNotes.tracksSinceNote(ids, index: 0, noted: ["a"]) == HostNotes.minGap)
+    }
+
+    @Test func walkingTheQueueOneTrackAtATimeNeverShowsTwoNotesWithinFiveTracks() {
+        let queue = (0..<30).map { slot(year: 2000 + $0, island: "Pop") }
+        let ids = (0..<queue.count).map { "s\($0)" }
+        var noted = Set<String>()
+        var last = -100
+        for current in queue.indices {
+            let window = Array(queue[current..<min(queue.count, current + 40)])
+            let notes = HostNotes.notes(window, sinceLast: HostNotes.tracksSinceNote(ids, index: current, noted: noted))
+            if notes.first?.index == 0 {
+                #expect(current - last >= HostNotes.minGap, "a note on \(current) after one on \(last)")
+                noted.insert(ids[current])
+                last = current
+            }
+        }
+        #expect(ids.indices.filter { noted.contains(ids[$0]) } == [0, 5, 10, 15, 20, 25])
+    }
+
+    @Test func aNameIsNotCopyButTheTemplateAndTheFactAre() {
+        #expect(HostNotes.notes([slot(artist: "Claude Debussy", fresh: true)]).map { HostNotes.text($0) } == ["New from Claude Debussy, an artist you play."])
+        #expect(HostNotes.notes([slot(artist: "Atmosphere", fresh: true)]).map { HostNotes.text($0) } == ["New from Atmosphere, an artist you play."])
+        // "learn" and "atmos" are whole words only: "learner" is not "learn".
+        #expect(HostNotes.isClean("A learner and the Atmosphere."))
+        #expect(!HostNotes.isClean("Learn the genre."))
+        #expect(!HostNotes.isClean("Dolby Atmos sound."))
+        #expect(!HostNotes.isClean("Hi-Res audio."))
+        // A fact (the atlas' sentence) with a banned word is dropped, a clean one stays.
+        #expect(HostNotes.notes([slot(genre: "Dance", fact: "Made for learn and lossless nights.")]).isEmpty)
+        #expect(HostNotes.notes([slot(genre: "Dance", fact: "Made for late nights.")]).count == 1)
     }
 
     @Test func atMostOneNotePerFiveTracksAndNoneInsideASetNote() {
@@ -209,7 +308,7 @@ struct BrainEndlessTests {
     @Test func everyKindsTextIsShortEnoughToBeSpoken() {
         let notes = [
             HostNotes.Note(index: 0, kind: HostNotes.kindNewFromArtist, a: "HIEUTHUHAI", b: ""),
-            HostNotes.Note(index: 0, kind: HostNotes.kindSideways, a: "Hip hop", b: "Bedroom pop"),
+            HostNotes.Note(index: 0, kind: HostNotes.kindSideways, a: "Bedroom pop", b: ""),
             HostNotes.Note(index: 0, kind: HostNotes.kindIsland, a: "Soft pop & R&B", b: ""),
             HostNotes.Note(index: 0, kind: HostNotes.kindGenreFact, a: "Dream pop", b: "Hazy pop made of echo and reverb"),
             HostNotes.Note(index: 0, kind: HostNotes.kindYear, a: "2019", b: ""),

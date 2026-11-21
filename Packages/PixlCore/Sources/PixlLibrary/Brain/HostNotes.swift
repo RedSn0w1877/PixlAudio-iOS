@@ -77,10 +77,13 @@ public enum HostNotes {
         }
     }
 
-    /// The host notes of `slots` (the current track first), in order. Never traps.
-    public static func notes(_ slots: [Slot], taken: [Taken] = []) -> [Note] {
+    /// The host notes of `slots` (the current track first), in order. Never traps. `sinceLast` is how many tracks ago the last note was shown
+    /// or spoken before the current track (1 = the track just before it; `minGap` or more = none close enough): the window is made again at
+    /// every track, so without it the current track would always be free for a note and one would land on almost every track (see
+    /// `tracksSinceNote`).
+    public static func notes(_ slots: [Slot], taken: [Taken] = [], sinceLast: Int = minGap) -> [Note] {
         var out: [Note] = []
-        var last = -minGap
+        var last = -(sinceLast < 1 ? 1 : (sinceLast > minGap ? minGap : sinceLast))
         for i in slots.indices {
             if i - last < minGap { continue }
             if !free(i, taken) { continue }
@@ -89,6 +92,18 @@ public enum HostNotes {
             last = i
         }
         return out
+    }
+
+    /// How many tracks before `index` (1 to `minGap` - 1) the nearest earlier queue position sits whose song is in `noted` (the songs whose
+    /// note was shown or spoken); `minGap` when none of the `minGap` - 1 tracks before `index` is one. The queue is `ids` in order.
+    public static func tracksSinceNote(_ ids: [String], index: Int, noted: Set<String>) -> Int {
+        var d = 1
+        while d < minGap {
+            let j = index - d
+            if j >= 0 && j < ids.count && noted.contains(ids[j]) { return d }
+            d += 1
+        }
+        return minGap
     }
 
     /// True when a note at `index` is at least `minGap` tracks from every taken note and outside the tracks a taken note describes.
@@ -108,10 +123,8 @@ public enum HostNotes {
         let genre = BrainText.trim(s.genre)
         var note: Note?
         if s.newFromPlayedArtist && !artist.isEmpty { note = checked(Note(index: i, kind: kindNewFromArtist, a: artist, b: "")) }
-        if note == nil && s.sideways && !genre.isEmpty {
-            let from = genreBefore(slots, i, genre)
-            if !from.isEmpty { note = checked(Note(index: i, kind: kindSideways, a: from, b: genre)) }
-        }
+        // The engine only says this pick comes from a genre next to the listener's own: the note says that and nothing more.
+        if note == nil && s.sideways && !genre.isEmpty { note = checked(Note(index: i, kind: kindSideways, a: genre, b: "")) }
         if note == nil && !BrainText.trim(s.island).isEmpty {
             note = checked(Note(index: i, kind: kindIsland, a: BrainText.trim(s.island), b: ""))
         }
@@ -121,18 +134,6 @@ public enum HostNotes {
         }
         if note == nil && s.year >= 1900 && s.year <= 2100 { note = checked(Note(index: i, kind: kindYear, a: String(s.year), b: "")) }
         return note
-    }
-
-    /// The genre of the nearest earlier track that has one different from `genre` (compared folded), or "".
-    private static func genreBefore(_ slots: [Slot], _ i: Int, _ genre: String) -> String {
-        let key = BrainText.fold(genre)
-        var j = i - 1
-        while j >= 0 {
-            let g = BrainText.trim(slots[j].genre)
-            if !g.isEmpty && !KotlinText.equals(BrainText.fold(g), key) { return g }
-            j -= 1
-        }
-        return ""
     }
 
     /// The first sentence of an atlas description, cut to a short clause and ended with a full stop; "" when it is empty, too long, or
@@ -162,7 +163,7 @@ public enum HostNotes {
     public static func text(_ note: Note) -> String {
         switch note.kind {
         case kindNewFromArtist: return "New from \(note.a), an artist you play."
-        case kindSideways: return "A step sideways, from \(note.a) to \(note.b)."
+        case kindSideways: return "A step sideways: \(note.a)."
         case kindIsland: return "From your \(note.a) side."
         case kindGenreFact: return "\(note.a): \(note.b)."
         case kindYear: return "Released in \(note.a)."
@@ -170,16 +171,29 @@ public enum HostNotes {
         }
     }
 
-    /// `note` when its text is short and clean, else nil (the kind is then not used for the track).
+    /// `note` when its text is short and clean, else nil (the kind is then not used for the track). The words the app never says are looked
+    /// for in what the app wrote (the template and the atlas' sentence), not in a name: an artist called Claude Debussy or a group called
+    /// Atmosphere is real data, not copy.
     private static func checked(_ note: Note) -> Note? {
         let t = text(note)
-        return !t.isEmpty && isSpeakable(t) ? note : nil
+        if t.isEmpty || !isShort(t) { return nil }
+        let ours = text(Note(index: note.index, kind: note.kind, a: "", b: note.kind == kindGenreFact ? note.b : ""))
+        return isClean(ours) ? note : nil
     }
 
-    /// True when `text` has at most `maxSentences` sentences of at most `maxWords` words and none of the words the app never says.
-    public static func isSpeakable(_ text: String) -> Bool {
-        let folded = BrainText.fold(text)
-        for w in WeeklyNote.forbidden where KotlinText.contains(folded, w, ignoreCase: false) { return false }
+    /// True when `text` is short (see `isShort`) and has none of the words the app never says (whole words, see `isClean`).
+    public static func isSpeakable(_ text: String) -> Bool { isShort(text) && isClean(text) }
+
+    /// True when no word or phrase of `WeeklyNote.forbidden` is in `text` as whole words: "Atmosphere" and "learner" are not "atmos" and
+    /// "learn". Compared folded, so "Hi-Res" is "hi res" on both sides.
+    public static func isClean(_ text: String) -> Bool {
+        let padded = " " + BrainText.fold(text) + " "
+        for w in WeeklyNote.forbidden where KotlinText.contains(padded, " " + BrainText.fold(w) + " ", ignoreCase: false) { return false }
+        return true
+    }
+
+    /// True when `text` has at most `maxSentences` sentences of at most `maxWords` words.
+    public static func isShort(_ text: String) -> Bool {
         var sentences = 0
         var words = 0
         var inWord = false

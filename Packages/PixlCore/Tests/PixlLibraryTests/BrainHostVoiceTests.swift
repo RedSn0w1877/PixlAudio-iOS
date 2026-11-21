@@ -215,6 +215,9 @@ struct BrainHostVoiceTests {
         #expect(HostVoice.line("A very very very very very very very very very very long sentence here.") == "")
         #expect(HostVoice.line("Learn the genre.") == "")
         #expect(HostVoice.line("Listen to the lossless sound.") == "")
+        // The note the app made itself was already checked against its own words: a name such as Claude Debussy is said, a long one is not.
+        #expect(HostVoice.line("New from Claude Debussy, an artist you play.", noteChecked: true) == "New from Claude Debussy, an artist you play.")
+        #expect(HostVoice.line("One. Two. Three.", noteChecked: true) == "")
     }
 
     @Test func noSpokenSentenceHasMoreThanTwelveWordsAndAtMostTwoSentencesAreSaid() {

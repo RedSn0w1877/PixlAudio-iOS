@@ -210,8 +210,10 @@ public enum HostVoice {
 
     /// The line the host says for a note's `text`, or "" when the note must stay on the screen only: at most `maxChars` characters, two
     /// sentences of at most `HostNotes.maxWords` words, none of the words the app never says; marks a voice reads badly are taken out
-    /// ("&" is said "and"). Text is never cut: a note that is too long is not said at all.
-    public static func line(_ text: String) -> String {
+    /// ("&" is said "and"). Text is never cut: a note that is too long is not said at all. `noteChecked` is true for the text of a note the
+    /// app made itself (`HostNotes` looked for the banned words in what the app wrote and not in a name, so "Claude Debussy" stays): only
+    /// its length is checked here.
+    public static func line(_ text: String, noteChecked: Bool = false) -> String {
         var sb: [UInt16] = []
         sb.reserveCapacity(text.utf16.count + 8)
         var lastSpace = true
@@ -230,7 +232,7 @@ public enum HostVoice {
         if sb.last == space { sb.removeLast() }
         if sb.isEmpty || sb.count > maxChars { return "" }
         let s = String(decoding: sb, as: UTF16.self)
-        return HostNotes.isSpeakable(s) ? s : ""
+        return (noteChecked ? HostNotes.isShort(s) : HostNotes.isSpeakable(s)) ? s : ""
     }
 
     private static func push(_ o: UInt16, _ sb: inout [UInt16], _ lastSpace: inout Bool) {
