@@ -199,3 +199,19 @@ readings go to the core as they are (offset 0), and NORMAL is its own tuning unc
 | Diagnostics | the gates, the active gate, the profile and thresholds, the hold level, the offset 0 note, offer in hand, names, the peer-tap verdict | `SongTapDiagnosticsScreen` |
 | Radio | the local name carries the short name (iOS may cut it), the Name characteristic, Android's manufacturer block read from `CBAdvertisementDataManufacturerDataKey`, `notify(client:value:)` for events; no way to set the advertising power | LOW advertising power, scan response block |
 | Not built (Android only) | the Pixel's RSSI offset and its 2 s Calibrate button (the iPhone is the reference) | `RssiCalibration` |
+
+## The Pixl ring code, pure core and scanner (2026-11-21, branch `everything`, milestone R1; Android `handoff/2026-11-21-ring-code.md`)
+
+The code style that replaces the plain QR as the visual fallback of Song Tap: an album-art disc, five rings of round dots (big =
+1, small = 0), an orange start dot, the video id and a session tag under Reed-Solomon. This milestone is the pure core, the
+renderer and the scanner in PixlCore, nothing on a screen yet (the Song Tap screen, the camera and the SwiftUI Canvas drawing are
+the next milestone, on both apps). Notes: `docs/handoff/2026-11-21-ring-code.md`.
+
+| Part | iOS | Android |
+|---|---|---|
+| Layout, Reed-Solomon, payload, timeline | `Packages/PixlCore/Sources/PixlLibrary/SongTap/ring/` (`RingCodeLayout`, `Gf256`, `ReedSolomon`, `RingCodePayload`, `RingCodeTimeline`, the Kotlin file names), integers only; Android's four `ring-*.jsonl` goldens replayed bit for bit | `:songtap` `.../songtap/ring/` |
+| Image side | `.../SongTap/ring/image/` (`RingCodeStyle`, `RingCodeRenderer`, `RingScanner` with `RingScanAccumulator`): Double and Foundation maths allowed here and only here (the purity test checks it), same constants and steps as Kotlin | `.../ring/image/` |
+| Pictures | the Swift renderer draws the shared scenes of `Fixtures/songtap-ring/scenes.jsonl` byte for byte like the Kotlin one (12 of 12 on Windows) and the Swift scanner reads the Kotlin renders (12 of 12) | `RingCodeRenderer`, `RingScanner` |
+| Colour | `RingCodeStyle.palette(accent)`: dots = the app accent (darkened toward tone 30 until 7:1 against the plate), plate = tone 95 of the same hue, chroma at most 8, the orange start dot fixed; flat plate, never Liquid Glass | the device colour (Material You primary), same rule |
+| App wiring | not yet: no screen, no AVFoundation camera, no Canvas drawing, no Info.plist change (camera and Bluetooth strings were added with Song Tap) | not yet |
+| Order of ways to beam | Bluetooth tap, then the ring code, then "Use QR code instead" after about 6 s of failed scanning (next milestone) | the same |
