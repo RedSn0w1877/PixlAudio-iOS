@@ -311,6 +311,36 @@ final class AutoplayQueueTests: XCTestCase {
         XCTAssertEqual(memory.current, station)
     }
 
+    func testTheHostsChipsHoldALevelForThisListeningOnlyAndTheSavedOneComesBack() throws {
+        let suite = "pixlaudio.tests.hostnovelty.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = StationStore(defaults: defaults)
+        let endless = Station.endless(seedMediaIds: ["u1", "u2"], title: "Endless Listening", nowMs: 9)
+        store.start(endless)
+        XCTAssertTrue(store.setNoveltyForHost(Novelty.discover))
+        XCTAssertEqual(store.novelty, Novelty.discover)
+        // Not saved: a restart sees the level the listener had.
+        XCTAssertEqual(StationStore(defaults: defaults).novelty, Novelty.blend)
+        // "Back to familiar" goes to the level before the chips, never to Discover.
+        XCTAssertEqual(store.levelBeforeHost(), Novelty.blend)
+        // The station ends: the saved level is back.
+        store.clear()
+        XCTAssertEqual(store.novelty, Novelty.blend)
+        // Another station than Endless Listening starting puts it back too.
+        store.start(endless)
+        XCTAssertTrue(store.setNoveltyForHost(Novelty.discover))
+        store.start(Station.artist(seedMediaId: "u1", artistName: "A", nowMs: 10))
+        XCTAssertEqual(store.novelty, Novelty.blend)
+        // The listener's own switch cancels the put-back and is saved, even when it equals the held level.
+        store.start(endless)
+        XCTAssertTrue(store.setNoveltyForHost(Novelty.discover))
+        XCTAssertFalse(store.setNovelty(Novelty.discover))
+        XCTAssertEqual(StationStore(defaults: defaults).novelty, Novelty.discover)
+        store.clear()
+        XCTAssertEqual(store.novelty, Novelty.discover)
+    }
+
     func testTheWordsOfAReasonLine() {
         XCTAssertEqual(BrainStrings.whyLine(.radioFans("d4vd")), "Fans of d4vd also play this")
         XCTAssertEqual(BrainStrings.whyLine(.becauseLiked("Woman")), "Because you liked Woman")
