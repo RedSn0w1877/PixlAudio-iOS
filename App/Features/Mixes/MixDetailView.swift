@@ -19,8 +19,9 @@ struct MixDetailView: View {
     var body: some View {
         Group {
             if let view, !view.songs.isEmpty {
-                MixScreen(title: LocalizedStringKey(Self.title(view)), songs: view.songs, playsFromLibrary: false,
-                          screenID: "mixDetail", titleLeading: 28, trailingHeaderButton: nil, topTrailingButton: nil,
+                // Redesign batch 3: the mix page in the secondary tone; these lists are planned by the brain and have no Remix.
+                MixScreen(tone: .secondary, tag: HomeRedesignStrings.mixTagMadeForYou, title: Self.title(view), songs: view.songs,
+                          playsFromLibrary: false, screenID: "mixDetail",
                           brain: BrainMixRows(BrainMixDetails.Part(view)), note: note)
             } else {
                 ZStack {
@@ -37,13 +38,7 @@ struct MixDetailView: View {
                         }
                     }
                     VStack {
-                        HStack {
-                            GlassCircleButton(systemImage: "arrow.backward", accessibilityLabel: "Back",
-                                              tint: theme.surface.opacity(GlassTint.surface)) { router.pop() }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.top, 8)
+                        MixPageTopButtons(screenID: "mixDetail", onBack: { router.pop() })
                         Spacer()
                     }
                 }
