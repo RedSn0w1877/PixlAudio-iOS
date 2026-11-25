@@ -320,6 +320,9 @@ private struct KaraokeRowContainer: View {
             .blur(radius: row.blur)
             .opacity(row.culled ? 0 : Double(row.alpha))
             .offset(y: min(row.y, 100_000))
+            // Duet sides are physical (singer one left, singer two right, as on Android): a right-to-left device
+            // language must not mirror the paddings, alignments and pivots of a duet row.
+            .transformEnvironment(\.layoutDirection) { if style.metrics.hasDuet { $0 = .leftToRight } }
     }
 
     @ViewBuilder private var content: some View {
@@ -381,7 +384,8 @@ private struct KaraokeLineRow: View {
             sung: Double(alphas.sung), unsung: Double(alphas.unsung), em: em,
             fade: CGFloat(EmphasisMath.fadeWidthPx(lineHeightPx: fontSize * LyricsRenderMetrics.lineHeightEm)),
             background: isBackground, reducedMotion: metrics.reducedMotion, highContrast: metrics.highContrast,
-            startAligned: metrics.textAlign(role: side) == .start && !LyricsRenderMetrics.isRtlText(line.text))
+            startAligned: metrics.textAlign(role: side) == .start
+                && (metrics.hasDuet || !LyricsRenderMetrics.isRtlText(line.text)))
 
         VStack(alignment: style.stackAlignment(role: side), spacing: CGFloat(metrics.extraGapPx)) {
             text

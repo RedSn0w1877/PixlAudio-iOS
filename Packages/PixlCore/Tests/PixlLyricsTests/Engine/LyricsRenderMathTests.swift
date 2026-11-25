@@ -91,6 +91,37 @@ struct LyricsRenderMathTests {
         #expect(solo.lines.allSatisfy { solo.sideRole(of: $0) == $0.role })
     }
 
+    /// Android `LyricLineAlignmentTest`'s golden table: width 1000, margins 24 / 44. Duet sides are physical (left /
+    /// right), so the side of `PreparedLyrics.sideRole(of:)` alone decides them, whatever the script.
+    @Test func goldenAlignmentTable() throws {
+        struct Placement: Equatable { var left: Float; var right: Float; var align: LyricsTextAlign; var pivot: Float }
+        let ltr = try line(Lyrics(synced: [SyncedLine(time: 0, line: "hello")]))
+        let rtl = try line(Lyrics(synced: [SyncedLine(time: 0, line: "שלום")]))
+        func place(_ m: LyricsRenderMetrics, _ side: PreparedVoiceRole, _ l: PreparedLine) -> Placement {
+            Placement(left: m.startPadding(role: side, width: 1_000), right: m.endPadding(role: side, width: 1_000),
+                      align: m.textAlign(role: side), pivot: m.pivotX(l, side: side))
+        }
+        for pref in KaraokeAlignment.allCases {
+            // Duets ignore the alignment preference; singer one (and its background vocals, and the group) left,
+            // singer two (and its background vocals) right, mirror images at the same outer margin.
+            let m = LyricsRenderMetrics(alignment: pref, hasDuet: true)
+            for text in [ltr, rtl] {
+                #expect(place(m, .lead, text) == Placement(left: 24, right: 150, align: .start, pivot: 0))
+                #expect(place(m, .background, text) == Placement(left: 24, right: 150, align: .start, pivot: 0))
+                #expect(place(m, .duet, text) == Placement(left: 150, right: 24, align: .end, pivot: 1))
+            }
+            // Narrow screens: the margins are the floor.
+            #expect(m.endPadding(role: .lead, width: 200) == 44)
+            #expect(m.startPadding(role: .duet, width: 100) == 24)
+        }
+        #expect(place(LyricsRenderMetrics(), .lead, ltr) == Placement(left: 24, right: 44, align: .start, pivot: 0))
+        #expect(place(LyricsRenderMetrics(), .lead, rtl).pivot == 1)
+        #expect(place(LyricsRenderMetrics(alignment: .center), .lead, ltr)
+            == Placement(left: 34, right: 34, align: .center, pivot: 0.5))
+        #expect(place(LyricsRenderMetrics(alignment: .end), .lead, ltr)
+            == Placement(left: 44, right: 24, align: .end, pivot: 1))
+    }
+
     @Test func rowLayoutStacksBlocksAndRoundsTheHeight() throws {
         let m = LyricsRenderMetrics()
         let row = LyricRowLayout.compute(metrics: m, role: .lead, width: 400, mainHeight: 41, romanizationHeight: 26.2,

@@ -128,14 +128,15 @@ public struct LyricsRenderMetrics: Sendable, Hashable {
         }
     }
 
-    /// Scale pivot X (0 = start edge, 1 = end edge): duet, RTL and end-aligned lines pivot on the right.
+    /// Scale pivot X (0 = left edge, 1 = right edge): the edge the line is aligned to. Duet sides are physical
+    /// (singer one left, singer two right, the view lays duet rows out left-to-right), so a right-to-left script
+    /// never flips a singer; outside duets RTL start-aligned lines pivot on the right.
     public func pivotX(_ line: PreparedLine) -> Float { pivotX(line, side: line.role) }
 
     /// `pivotX` for a line placed on the side of `side` (`PreparedLyrics.sideRole(of:)`).
     public func pivotX(_ line: PreparedLine, side: PreparedVoiceRole) -> Float {
+        if hasDuet { return side == .duet ? 1 : 0 }
         let rtl = Self.isRtlText(line.text)
-        if hasDuet && side == .duet { return 1 }
-        if hasDuet { return rtl ? 1 : 0 }
         switch alignment {
         case .center: return 0.5
         case .end: return 1

@@ -55,14 +55,13 @@ public struct PreparedLyrics: Sendable, Hashable {
         hasher.combine(startsSorted)
     }
 
-    /// The role that decides which side a line sits on (paddings, text alignment, scale pivot). A background vocal
-    /// grouped under a duet line follows that line to the end side in a duet song; every other line keeps its own
-    /// role. The font size still follows `PreparedLine.role` (background vocals stay 0.65 em).
+    /// The role that decides which side a line sits on (paddings, text alignment, scale pivot): `.duet` for a line
+    /// on the end side (`PreparedLine.duetEnd`: a duet line, a background vocal grouped under one, or an orphan the
+    /// source nested in one), else the line's own role. The font size still follows `PreparedLine.role` (background
+    /// vocals stay 0.65 em).
     public func sideRole(of line: PreparedLine) -> PreparedVoiceRole {
-        guard hasDuet, line.isGroupedBackground, lines.indices.contains(line.groupLeadIndex),
-              lines[line.groupLeadIndex].role == .duet
-        else { return line.role }
-        return .duet
+        guard hasDuet else { return line.role }
+        return line.duetEnd || line.role == .duet ? .duet : line.role
     }
 }
 
@@ -106,10 +105,15 @@ public struct PreparedLine: Sendable, Hashable {
     public let syllables: [PreparedSyllable]?
     public let translation: String?
     public let romanization: String?
+    /// Duet songs only: the line sits on the end (right) side. True for a duet-voice line and for a background vocal
+    /// grouped under one, so a background vocal always follows the side of the line it belongs to. Always false when
+    /// the song has no duet voice.
+    public let duetEnd: Bool
 
     public init(index: Int, startMs: Int64, endMs: Int64, endIsExplicit: Bool, text: String, role: PreparedVoiceRole,
                 groupLeadIndex: Int, bgAbove: Bool, syllables: [PreparedSyllable]?, translation: String?,
-                romanization: String?) {
+                romanization: String?, duetEnd: Bool = false) {
+        self.duetEnd = duetEnd
         self.index = index
         self.startMs = startMs
         self.endMs = endMs

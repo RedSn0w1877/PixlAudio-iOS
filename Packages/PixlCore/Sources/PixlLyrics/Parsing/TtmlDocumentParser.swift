@@ -4,7 +4,10 @@
 //    </span>`), a space between spans starts a new word;
 //  - background vocals (`<span ttm:role="x-bg">`) as background lines, their wrapping parentheses removed;
 //  - duets: the first singer (`ttm:agent`, inherited from `div`/`body`) is the lead, any other person is the duet
-//    voice, a group agent sings with the lead;
+//    voice, a group agent sings with the lead. Agents a paragraph uses without declaring them count too (`v1000` and
+//    up, the catalogs' group ids, sing with the lead). In a duet song every background vocal is filed under
+//    `LyricsVoiceIds.leadBackground` / `.duetBackground` (role `background`) by the paragraph it was nested in, so
+//    the karaoke view keeps it on that singer's side;
 //  - line-only documents (`<p>` with text and no timed spans) as line-synced lines, untimed documents as plain text;
 //  - head translations / transliterations (`<text for="L1">`, keyed by `lrc:key`/`itunes:key`) and inline
 //    `x-translation` / `x-roman` spans as each lead line's translation and romanisation (on-device romanisation fills
@@ -325,6 +328,15 @@ public enum TtmlDocumentParser {
             }
             if built.isEmpty { return nil }
 
+            // In a duet the karaoke view needs to know whose line a background vocal was nested in, so it stays on
+            // that singer's side even when the other singer's line overlaps it.
+            if built.contains(where: { !$0.isBackground && $0.voiceId.isIdentical(to: duetVoiceId) }) {
+                for i in built.indices where built[i].isBackground {
+                    built[i].voiceId = voices[built[i].paragraph].isIdentical(to: duetVoiceId)
+                        ? LyricsVoiceIds.duetBackground : LyricsVoiceIds.leadBackground
+                }
+            }
+
             // Stable sort by start; lines without an end end where the next line starts, else at the body's `dur`.
             built = PreparedText.stableSorted(built, by: \.startMs)
             var lines: [TimedLine] = []
@@ -341,8 +353,9 @@ public enum TtmlDocumentParser {
             let usedVoices = Set(lines.map(\.voiceId))
             var docVoices = [Voice(id: leadVoiceId, role: VoiceRole.lead)]
             if usedVoices.contains(duetVoiceId) { docVoices.append(Voice(id: duetVoiceId, role: VoiceRole.duet)) }
-            if usedVoices.contains(backgroundVoiceId) {
-                docVoices.append(Voice(id: backgroundVoiceId, role: VoiceRole.background))
+            for id in [backgroundVoiceId, LyricsVoiceIds.leadBackground, LyricsVoiceIds.duetBackground]
+            where usedVoices.contains(id) {
+                docVoices.append(Voice(id: id, role: VoiceRole.background))
             }
             var docMetadata = metadata
             docMetadata.durationMs = nil
@@ -356,14 +369,18 @@ public enum TtmlDocumentParser {
         }
 
         /// The voice of each paragraph: the first person agent that sings a line is the lead; other people are
-        /// the duet voice; groups and lines without an agent are the lead.
+        /// the duet voice; groups and lines without an agent are the lead. An agent used without a `<ttm:agent>`
+        /// declaration is a person, unless its id is a catalog group id (`v1000` and up).
         func voiceIds(_ paragraphs: [Paragraph]) -> [String] {
             var types: [String: String] = [:]
             for agent in root.descendants(localName: "agent") {
                 guard let id = attribute(agent, "id") else { continue }
                 types[id] = attribute(agent, "type")?.lowercased() ?? "person"
             }
-            func isGroup(_ agent: String) -> Bool { types[agent].map { $0 == "group" } ?? false }
+            func isGroup(_ agent: String) -> Bool {
+                if let type = types[agent] { return type == "group" }
+                return Self.isGroupAgentId(agent)
+            }
             let lead = paragraphs.lazy.compactMap(\.agent).first { !isGroup($0) }
             return paragraphs.map { paragraph in
                 guard let agent = paragraph.agent, let lead, !isGroup(agent), !agent.isIdentical(to: lead) else {
@@ -371,6 +388,16 @@ public enum TtmlDocumentParser {
                 }
                 return duetVoiceId
             }
+        }
+
+        /// `v1000`, `V1001`…: the id the catalogs give the "everyone" agent.
+        static func isGroupAgentId(_ id: String) -> Bool {
+            let scalars = Array(id.unicodeScalars)
+            guard scalars.count > 1, scalars[0] == "v" || scalars[0] == "V",
+                  scalars.dropFirst().allSatisfy({ ("0"..."9").contains($0) }),
+                  let number = Int(String(String.UnicodeScalarView(scalars.dropFirst())))
+            else { return false }
+            return number >= 1_000
         }
 
         /// A line from its pieces: untimed text joins the neighbouring timed piece; the line spans its paragraph
