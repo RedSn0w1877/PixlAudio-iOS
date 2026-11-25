@@ -124,8 +124,15 @@ final class AIScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.5)
         if let text {
             let predicate = NSPredicate(format: "label CONTAINS %@", text)
-            XCTAssertTrue(app.staticTexts.containing(predicate).firstMatch.waitForExistence(timeout: 15),
-                          "\"\(text)\" did not appear")
+            let match = app.staticTexts.containing(predicate).firstMatch
+            // Redesign 2: the taller header and input pills leave less of the chat on screen, and the list is lazy, so an
+            // earlier card may sit above the fold: scroll back up a little until it shows.
+            var found = match.waitForExistence(timeout: 15)
+            for _ in 0..<3 where !found {
+                app.swipeDown(velocity: .slow)
+                found = match.waitForExistence(timeout: 3)
+            }
+            XCTAssertTrue(found, "\"\(text)\" did not appear")
             Thread.sleep(forTimeInterval: 1.0)
         }
         if let action {
