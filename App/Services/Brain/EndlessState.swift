@@ -29,6 +29,31 @@ final class EndlessState {
         spokenValue = defaults?.object(forKey: PreferenceKeys.endlessSpokenNotes) as? Bool ?? false
     }
 
+    /// The chip the host sheet was opened with from the station screen's quick asks, and whether its mic started speech (redesign batch 3,
+    /// Android `EndlessStateHolder.openHostSheet`). Both are read once by the sheet (`takePendingChip`, `takePendingVoice`).
+    @ObservationIgnored private var pendingChip: HostChip?
+    @ObservationIgnored private var pendingVoice = false
+
+    func setPendingHostRequest(chip: HostChip?, voice: Bool) {
+        pendingChip = chip
+        pendingVoice = voice
+    }
+
+    /// The chip the sheet was opened with, once.
+    func takePendingChip() -> HostChip? {
+        defer { pendingChip = nil }
+        return pendingChip
+    }
+
+    /// True once when the sheet was opened from the mic.
+    func takePendingVoice() -> Bool {
+        defer { pendingVoice = false }
+        return pendingVoice
+    }
+
+    /// The introduction was opened from the station screen's options (How it works): closing it goes back to the station.
+    @ObservationIgnored var introReturnsToStation = false
+
     /// True once the three-page introduction was shown (Start listening or Not now).
     var isIntroSeen: Bool { seenValue }
 

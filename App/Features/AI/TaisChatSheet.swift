@@ -31,6 +31,8 @@ struct TaisChatSheet: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var sheetVisible = false
+    /// Opened from the station screen's mic (redesign batch 3): speech input starts once, as soon as the sheet is up.
+    @State private var startVoice = false
     /// The visible height of the empty state's scroll view (between the bars), to centre the hero in it.
     @State private var emptyHeight: CGFloat = 0
 
@@ -48,7 +50,9 @@ struct TaisChatSheet: View {
         let isEmpty = model.messages.isEmpty
         let thinking = model.isThinking
         Group {
-            if isEmpty {
+            if isEmpty && hostMode {
+                HostEmptyState()
+            } else if isEmpty {
                 emptyState
             } else {
                 messageList
@@ -59,12 +63,24 @@ struct TaisChatSheet: View {
         // field too and replaced its own `taisChat.input` (CI run 37130222151).
         .accessibilityIdentifier("screen.taisChat")
         .safeAreaBar(edge: .top) {
-            header(thinking: thinking)
+            if hostMode {
+                // Ask the host (redesign batch 3, AndroidAskHost): the host's header, 16 pt, the now-playing strip, 16 pt.
+                VStack(spacing: 16) {
+                    HostSheetHeader(onClose: { dismiss() })
+                    HostNowPlayingStrip()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 22)
+                .padding(.bottom, 16)
+            } else {
+                header(thinking: thinking)
+            }
         }
         .safeAreaBar(edge: .bottom) {
             VStack(spacing: 0) {
                 if hostMode { HostChipsRow(enabled: !thinking, onChip: { model.hostChip($0) }) }
-                TaizoInputPills(model: model, onSend: { send($0) }, onClose: { dismiss() })
+                TaizoInputPills(model: model, onSend: { send($0) }, onClose: { dismiss() }, hostMode: hostMode,
+                                startVoice: startVoice)
             }
         }
         // "Why this song" from the host's chips: the existing sheet, over the chat.
@@ -72,9 +88,15 @@ struct TaisChatSheet: View {
             WhyThisSongSheet(song: ref.song, why: ref.why).pixlSheet()
         }
         .animation(.spring(response: 0.55, dampingFraction: 0.86), value: isEmpty)
+        .environment(\.taizoHost, hostMode)
         .onAppear {
             sheetVisible = true
             model.hostMode = hostMode
+            // The station screen's quick asks and its mic (redesign batch 3): the chip is sent, or speech starts, once.
+            if hostMode {
+                if let chip = env.endless.takePendingChip() { model.hostChip(chip) }
+                if env.endless.takePendingVoice() { startVoice = true }
+            }
             model.restoreIfNeeded()
             // The on-device model loads while the user types (nothing in UI tests or with a cloud assistant).
             env.ai.prewarm(.chat)
@@ -242,6 +264,11 @@ struct TaizoInputPills: View {
     /// Sends the typed prompt (nil) or the spoken text.
     let onSend: (String?) -> Void
     let onClose: () -> Void
+    /// Ask the host (redesign batch 3): the station's colours (`tertiaryContainer`), the left pill (infinity) goes back to the station,
+    /// and the hint is the host's.
+    var hostMode = false
+    /// Start speech input as soon as the pills are up (the station's mic).
+    var startVoice = false
 
     @Environment(\.appTheme) private var theme
     @Environment(PlaybackStore.self) private var playback
@@ -256,19 +283,19 @@ struct TaizoInputPills: View {
         let hasText = !model.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let action: Action = isResponding ? .stop : (voice.isListening ? .stop : (!hasText && voiceAvailable ? .mic : .send))
         let enabled = isResponding || voice.isListening || hasText || voiceAvailable
-        let pill = theme.primaryContainer
-        let onPill = theme.onPrimaryContainer
+        let pill = hostMode ? theme.tertiaryContainer : theme.primaryContainer
+        let onPill = hostMode ? theme.onTertiaryContainer : theme.onPrimaryContainer
         HStack(alignment: .bottom, spacing: 10) {
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 21, weight: .medium))
+                Image(systemName: hostMode ? "infinity" : "xmark")
+                    .font(.system(size: hostMode ? 23 : 21, weight: .medium))
                     .foregroundStyle(theme.onSurface)
                     .frame(width: 68, height: 68)
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .pixlGlass(in: Circle(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
-            .accessibilityLabel("Close")
+            .accessibilityLabel(hostMode ? Text(verbatim: HomeRedesignStrings.backToStation) : Text("Close"))
             .accessibilityIdentifier("taisChat.close")
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
@@ -276,7 +303,9 @@ struct TaizoInputPills: View {
                     .foregroundStyle(onPill)
                     .accessibilityHidden(true)
                 TextField("", text: voice.isListening ? .constant(voice.transcript) : $model.inputText,
-                          prompt: Text(voice.isListening ? "Listening…" : "Ask Taizo anything…")
+                          prompt: Text(voice.isListening ? LocalizedStringKey("Listening…")
+                                           : (hostMode ? LocalizedStringKey(HomeRedesignStrings.hostInputHint)
+                                              : LocalizedStringKey("Ask Taizo anything…")))
                               .foregroundStyle(onPill.opacity(0.72)),
                           axis: .vertical)
                     .pixlFont(.custom(size: 15, lineHeight: 20))
@@ -291,7 +320,7 @@ struct TaizoInputPills: View {
                     switch action {
                     case .stop:
                         if voice.isListening { voice.stop() } else { model.stop() }
-                    case .mic: startVoice()
+                    case .mic: beginVoice()
                     case .send: onSend(nil)
                     }
                 } label: {
@@ -318,10 +347,15 @@ struct TaizoInputPills: View {
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 10)
-        .task { voiceAvailable = TaizoVoiceInput.isAvailable && !LaunchConfiguration.current.isUITest }
+        .task {
+            voiceAvailable = TaizoVoiceInput.isAvailable && !LaunchConfiguration.current.isUITest
+        }
+        .onChange(of: startVoice, initial: true) { _, start in
+            if start && TaizoVoiceInput.isAvailable && !LaunchConfiguration.current.isUITest && !voice.isListening { beginVoice() }
+        }
     }
 
-    private func startVoice() {
+    private func beginVoice() {
         focused = false
         Task {
             await voice.start(pausePlayback: {
