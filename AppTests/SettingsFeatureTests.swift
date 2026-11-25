@@ -17,12 +17,13 @@ final class SettingsFeatureTests: XCTestCase {
 
     // MARK: Main list
 
-    /// The everyday rows, Accounts first and About last; Developer and Device capabilities come only with developer
-    /// mode (under its switch, the list's last group).
+    /// Redesign 2 (Android `SettingsScreen`): the Accounts card, then Listening (Playback, Equalizer, Lyrics, Sing,
+    /// Endless Listening, Song Tap) and App (AI, Music management, Appearance, Behaviour, Backup, About); Developer and
+    /// Device capabilities come only with developer mode (under its switch, at the end of App).
     func testMainListOrderMatchesAndroid() {
         let everyday = [
-            "accounts", "appearance", "playback", "equalizer", "lyrics", "sing", "song_tap", "behavior", "library", "ai",
-            "endless", "backup_restore", "about",
+            "accounts", "playback", "equalizer", "lyrics", "sing", "endless", "song_tap",
+            "ai", "library", "appearance", "behavior", "backup_restore", "about",
         ]
         XCTAssertEqual(SettingsMainEntry.ordered(developerMode: false).map(\.id), everyday)
         XCTAssertEqual(SettingsMainEntry.ordered(developerMode: true).map(\.id),

@@ -107,9 +107,10 @@ nonisolated enum SettingsMetrics {
     static let headerExpandedLong: CGFloat = 148
     /// `minTopBarHeight` = 64 dp + status bar.
     static let headerCollapsed: CGFloat = 64
-    /// Section rows: Surface corners 10 dp inside a 24 dp clipped group, 2 dp apart (`SettingsSubsection`).
-    static let rowInnerRadius: CGFloat = 10
-    static let groupRadius: CGFloat = 24
+    /// Section rows (redesign 2): 4 dp-cornered tiles inside a 20 dp clipped group, 2 dp apart (`SettingsSubsection`;
+    /// were 10 / 24).
+    static let rowInnerRadius: CGFloat = 4
+    static let groupRadius: CGFloat = 20
     static let rowSpacing: CGFloat = 2
 }
 

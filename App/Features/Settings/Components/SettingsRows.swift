@@ -1,9 +1,9 @@
 import SwiftUI
 
 // PixlAudio's settings rows (Android `SettingsComponents.kt`, Material 3 mode) as Liquid Glass. A section is a
-// caption (`labelMedium`, `primary`, 12 pt in) over rows 2 pt apart; each row was a `surfaceContainer` Surface with
-// 10 dp corners inside a group clipped to 24 dp — here every row is its own glass shape with the same corners: 24 pt
-// on the group's outside edges, 10 pt between rows. Controls on a row are plain fills or system controls (no glass
+// caption (redesign 2: 14/20 medium, `primary`, 16 pt in) over rows 2 pt apart; each row is a `surfaceContainer`
+// Surface with 4 dp corners inside a group clipped to 20 dp — here every row is its own glass shape with the same
+// corners: 20 pt on the group's outside edges, 4 pt between rows. Controls on a row are plain fills or system controls (no glass
 // on glass). One glass layer per row, no container per row.
 
 /// Corner radii a row takes from its position in a group.
@@ -63,12 +63,13 @@ struct SettingsSubsection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Redesign 2: the group label 14/20 medium `primary`, 16 pt in, 6 pt under.
             Text(title)
-                .pixlFont(.labelMedium)
+                .pixlFont(.custom(size: 14, weight: .medium, lineHeight: 20, tracking: 0.1))
                 .foregroundStyle(theme.primary)
-                .padding(.leading, 12)
+                .padding(.leading, 16)
                 .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
             SettingsGroup { content }
             if addBottomSpace {
