@@ -265,6 +265,8 @@ struct TaisChatMessageRow: View {
     var onLessUndo: (Int) -> Void = { _ in }
 
     @Environment(\.appTheme) private var theme
+    /// The host of Endless Listening answers here (redesign batch 3): its mark and "Host" instead of Taizo's.
+    @Environment(\.taizoHost) private var isHost
 
     /// Redesign 2 (Android `AskTaizoSheet`, mockup AndroidAskTaizo): an error answer keeps a bubble (4 pt top-leading,
     /// 20 elsewhere); the user's bubble has a 6 pt bottom-trailing corner, 24 elsewhere.
@@ -358,7 +360,7 @@ struct TaisChatMessageRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 TaizoShapeAvatar(size: 28)
-                Text(verbatim: "Taizo")
+                Text(verbatim: isHost ? HomeRedesignStrings.hostName : "Taizo")
                     .pixlFont(.redesignLabel)
                     .foregroundStyle(theme.onSurfaceVariant)
             }
@@ -1117,11 +1119,22 @@ struct TaizoLessRow: View {
 struct TaizoShapeAvatar: View {
     let size: CGFloat
     @Environment(\.appTheme) private var theme
+    /// Inside the host sheet (Endless Listening) the avatar is the host's mark (redesign batch 3, Android `LocalTaizoHost`).
+    @Environment(\.taizoHost) private var isHost
 
     var body: some View {
-        ShapeBadge(systemImage: "sparkles", shape: .sunny, container: theme.secondaryContainer,
-                   content: theme.onSecondaryContainer, size: size, iconSize: size * 0.46)
+        if isHost {
+            HostBadge(size: size)
+        } else {
+            ShapeBadge(systemImage: "sparkles", shape: .sunny, container: theme.secondaryContainer,
+                       content: theme.onSecondaryContainer, size: size, iconSize: size * 0.46)
+        }
     }
+}
+
+extension EnvironmentValues {
+    /// True inside Ask Taizo while it is the host of Endless Listening: avatars and names become the host's.
+    @Entry var taizoHost = false
 }
 
 /// The refine / suggestion chip (redesign 2, Android `TaizoOutlinedChip`): 44 pt min, 12 pt corners, a 1 pt `outline`

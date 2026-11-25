@@ -1447,3 +1447,25 @@ live in `DesignSystem/Components/RedesignKit.swift`, the port of `RedesignKit.kt
   corners spring 16 pt ↔ round) and the owner's thin progress line (3 pt, 24 pt in, 5 pt up, track `onPrimaryContainer`
   16 %). `MiniPlayerProgressLine` samples the clock on a `TimelineView` only while playing and on screen, about once per
   point the line's end moves; only it redraws.
+
+## Redesign batch 3 (2026-11-25, branch `redesign-3`)
+
+Android's batch 3 (Home, the mix pages, Endless Listening's intro, station and host; Android `handoff/2026-11-25-redesign-2.md` ›
+Batch 3) on iOS. Values are Android's (1 dp = 1 pt); the pieces are `Features/Home/HomeRedesign.swift`, `Features/Mixes/MixPage.swift`,
+`Features/Brain/EndlessIntroView.swift`, `Features/Brain/EndlessStationView.swift` and the host views in `EndlessHostViews.swift`.
+
+- **Type:** Android's "wide" (Google Sans Flex wdth 125, w800) is SF Pro `.expanded` heavy and "narrow" (wdth 75) is `.compressed`
+  heavy (`HomeFaces`). `TwoToneTitle` is one `AttributedString` (wide run + accent run), so it wraps and truncates as one text; the
+  greeting's two lines are `FitWidthTitle`s (narrowed to fit, two lines at most).
+- **Glass mapping:** every filled card, pill, chip and circle Android draws is one glass shape tinted with that role — `prominent`
+  for `primary*`, `secondaryContainer`, `tertiaryContainer` accents (Endless pill, Ask Taizo card, Next pill, station play button, host
+  note, Ask the host pill), `container` for the decorated cards (Your mix hero, mix squares), `surface` for `surfaceContainer*` (time
+  chip, Rewind tiles, Why these?, circle buttons, now-playing strip). Outlined chips (footer links, quick asks, host chips) are clear
+  glass with a 1 pt `outline` border. What sits on a glass card is a fill: the hero's play square, the tag pills, the Endless pill's
+  circle and the mic circle, the decoration shapes (`ExpressiveBadgeShape`, clipped to the card).
+- **Drawings stay drawings:** the mix page's 400 pt cover and the intro's stage (loop, riders, note cards, bubbles, chips) are fills —
+  they stand in for artwork, not for Material components.
+- **Collapsed header:** Android draws `surface` at 94 % with no blur; iOS does the same (no fake glass), with the glass buttons on it.
+- **Motion:** the intro's loop is one `TimelineView` moving four shapes by transform, only on page 1, on screen, app active, no Reduce
+  Motion; cards are dealt in with one spring each (0.12 s stagger). The collapsed header springs in (fade + 24 pt). The station's
+  progress row samples the clock at most 4 Hz while playing; the host strip's line at 2 Hz.

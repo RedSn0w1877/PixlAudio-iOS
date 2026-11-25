@@ -2,28 +2,33 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Daily Mix (Android `DailyMixScreen`): today's 30 personalised picks under the expressive cover-stack header.
+/// Daily Mix (Android `DailyMixScreen`): today's picks on the mix page (redesign batch 3, tertiary): Remix draws a new Daily Mix, More
+/// opens the AI playlist prompt.
 struct DailyMixView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(LibraryStore.self) private var library
 
     var body: some View {
         let details = env.home.brainMixDetails
-        MixScreen(title: "Daily Mix", songs: env.home.content.dailyMix, playsFromLibrary: false, screenID: "dailyMix",
-                  titleLeading: 22 + 6, trailingHeaderButton: .ai, topTrailingButton: nil,
-                  brain: details.ownsMixes ? BrainMixRows(details.daily) : nil)
+        MixScreen(tone: .tertiary, tag: HomeRedesignStrings.mixTagDaily, title: BrainStrings.mixDaily,
+                  songs: env.home.content.dailyMix, playsFromLibrary: false, screenID: "dailyMix",
+                  remix: { await env.home.regenerateDailyMix(snapshot: library.snapshot, libraryRevision: library.songsRevision) },
+                  showsMore: true, brain: details.ownsMixes ? BrainMixRows(details.daily) : nil)
     }
 }
 
-/// Your Mix (Android `YourMixScreen`): the full list the Home shelf teases, with the same curated → daily →
-/// newest-songs fallback, and a regenerate button.
+/// Your Mix (Android `YourMixScreen`): the full list the Home hero opens, with the same curated → daily → newest-songs fallback, on the
+/// mix page (primary); Remix regenerates it.
 struct YourMixView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(LibraryStore.self) private var library
 
     var body: some View {
         let content = env.home.content
         let details = env.home.brainMixDetails
-        MixScreen(title: "YOUR MIX", songs: content.yourMix, playsFromLibrary: content.usesFallbackYourMix,
-                  screenID: "yourMix", titleLeading: 28, trailingHeaderButton: nil, topTrailingButton: .regenerate,
+        MixScreen(tone: .primary, tag: HomeRedesignStrings.mixTagYour, title: HomeRedesignStrings.yourMixName,
+                  songs: content.yourMix, playsFromLibrary: content.usesFallbackYourMix, screenID: "yourMix",
+                  remix: { await env.home.regenerateYourMix(snapshot: library.snapshot) },
                   brain: details.ownsMixes && !content.usesFallbackYourMix ? BrainMixRows(details.your) : nil)
     }
 }
@@ -42,22 +47,21 @@ struct BrainMixRows {
     }
 }
 
-/// The structure Daily Mix and Your Mix share on Android (two screens, same layout): a gradient background
-/// (`primary` 25 % → `surface`), a 340 pt header with three tilted covers (180 / 220 / 180 pt, −15° / 0° / 15°,
-/// overlapping by 80 pt) that parallaxes and fades as the list scrolls, the title (44 pt bold) and "N Songs • time",
-/// a 76 pt Play it / Shuffle row, then the songs as glass cards. Floating glass back (and regenerate) circles.
+/// The mix page (redesign batch 3, `MixPage.swift`) that Daily Mix, Your Mix and the other made-for-you lists share: the cover and its
+/// block as the list's first item, the songs as glass cards with the brain's reason under each, Back / Save / More floating over the
+/// page. The nav bar and the mini player stay (Android: Daily Mix left the hidden-nav list).
 struct MixScreen: View {
-    enum HeaderButton { case ai }
-    enum TopButton { case regenerate }
-
-    let title: LocalizedStringKey
+    let tone: MixPageTone
+    let tag: String
+    let title: String
     let songs: [Song]
     /// The fallback mix plays from the whole library (Android `showAndPlaySongFromLibrary`).
     let playsFromLibrary: Bool
     let screenID: String
-    let titleLeading: CGFloat
-    let trailingHeaderButton: HeaderButton?
-    let topTrailingButton: TopButton?
+    /// Remix (Daily: a new Daily Mix, Your: regenerate); nil for the lists the brain plans (no reroll, no button).
+    var remix: (() async -> Void)?
+    /// Daily Mix only: the on-device AI prompt sheet.
+    var showsMore = false
     /// Nil while the legacy mixes are showing.
     var brain: BrainMixRows?
     /// The weekly note of First Listen: two or three sentences from the list itself (docs/brain-spec.md, 9.3). Nil for every other list.
@@ -68,11 +72,13 @@ struct MixScreen: View {
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
-    @State private var isRegenerating = false
+    @State private var isRemixing = false
+    @State private var safeTop: CGFloat = 0
+    @State private var savingIds: IdentifiedIds?
 
     var body: some View {
         ZStack(alignment: .top) {
-            background
+            theme.surface.ignoresSafeArea()
             if songs.isEmpty {
                 ProgressView()
                     .controlSize(.large)
@@ -81,32 +87,29 @@ struct MixScreen: View {
             } else {
                 list
             }
-            edgeGradients
-            topButtons
+            MixPageTopButtons(screenID: screenID, onBack: { router.pop() },
+                              onSave: songs.isEmpty ? nil : { savingIds = IdentifiedIds(ids: songs.map(\.id)) },
+                              onMore: showsMore ? { router.present(AppSheet.aiPlaylist) } : nil)
         }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.top } action: { safeTop = $0 }
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("screen.\(screenID)")
+        .sheet(item: $savingIds) { item in
+            AddToPlaylistSheet(songIds: item.ids)
+                .pixlSheet(detents: [.large])
+        }
     }
 
     private var list: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
-                MixHeader(title: title, songs: songs, titleLeading: titleLeading,
-                          showsAIButton: trailingHeaderButton == .ai)
-                if let note {
-                    MixWeeklyNote(text: note)
-                }
-                MixPlayShuffleRow(
-                    playTitle: "Play it",
-                    height: 76, verticalPadding: 8, horizontalPadding: 20, outerRadius: 60,
-                    onPlay: { play(from: songs[0]); if playback.isShuffleEnabled { playback.setShuffleEnabled(false) } },
-                    onShuffle: {
-                        if playsFromLibrary {
-                            playback.play(library.songs.shuffled())
-                        } else {
-                            playback.play(songs.shuffled(), source: mixSource, tags: brain?.tags ?? [:])
-                        }
-                    })
+                MixPageHero(tone: tone, tag: tag, title: title, meta: MixPageText.meta(songs),
+                            why: MixPageText.why(note: note, songCount: songs.count,
+                                                 novelCount: brain.map { rows in songs.count(where: { rows.novelIds.contains($0.id) }) } ?? 0),
+                            safeTop: safeTop,
+                            onShuffle: shuffle, onPlay: playFromStart,
+                            onRemix: remix.map { remix in { runRemix(remix) } }, remixBusy: isRemixing, screenID: screenID)
+                    .padding(.bottom, 12)
                 ForEach(songs) { song in
                     VStack(spacing: 0) {
                         PlaybackRowState(songId: song.id) { isCurrent, isPlaying in
@@ -127,6 +130,31 @@ struct MixScreen: View {
         .ignoresSafeArea(edges: .top)
     }
 
+    private func runRemix(_ remix: @escaping () async -> Void) {
+        guard !isRemixing else { return }
+        isRemixing = true
+        Task {
+            await remix()
+            isRemixing = false
+        }
+    }
+
+    /// Android: play from the first song, shuffle off.
+    private func playFromStart() {
+        guard let first = songs.first else { return }
+        play(from: first)
+        if playback.isShuffleEnabled { playback.setShuffleEnabled(false) }
+    }
+
+    private func shuffle() {
+        guard !songs.isEmpty else { return }
+        if playsFromLibrary {
+            playback.play(library.songs.shuffled())
+        } else {
+            playback.play(songs.shuffled(), source: mixSource, tags: brain?.tags ?? [:])
+        }
+    }
+
     private func play(from song: Song) {
         if playsFromLibrary {
             playback.play(song, in: library.songs)
@@ -144,139 +172,6 @@ struct MixScreen: View {
         case "yourMix": .yourMix
         default: .namedMix
         }
-    }
-
-    /// `Brush.verticalGradient(primary 25 %, surface 50 %, surface, endY = 1200 px)`.
-    private var background: some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [theme.primary.opacity(0.25), theme.surface.opacity(0.5), theme.surface],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 460)
-            theme.surface
-        }
-        .background(theme.surface)
-        .ignoresSafeArea()
-    }
-
-    /// Android's top (50 pt, `surfaceContainerLowest` 50 % → clear) and bottom (80 pt) fades.
-    private var edgeGradients: some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [theme.surfaceContainerLowest.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: 50)
-                .ignoresSafeArea(edges: .top)
-            Spacer()
-            LinearGradient(colors: [.clear, theme.surfaceContainerLowest.opacity(0.5), theme.surfaceContainerLowest],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 80)
-                .ignoresSafeArea(edges: .bottom)
-        }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    /// Back (and regenerate) as glass circles, 10 pt in and 8 pt below the status bar.
-    private var topButtons: some View {
-        HStack {
-            GlassCircleButton(systemImage: "arrow.backward", accessibilityLabel: "Back",
-                              tint: theme.surface.opacity(GlassTint.surface)) { router.pop() }
-                .accessibilityIdentifier("\(screenID).back")
-            Spacer()
-            if topTrailingButton == .regenerate {
-                GlassCircleButton(systemImage: "arrow.clockwise", accessibilityLabel: "Regenerate your mix",
-                                  tint: theme.surface.opacity(GlassTint.surface)) {
-                    guard !isRegenerating else { return }
-                    isRegenerating = true
-                    Task {
-                        await env.home.regenerateYourMix(snapshot: library.snapshot)
-                        isRegenerating = false
-                    }
-                }
-                .opacity(isRegenerating ? 0.5 : 1)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.top, 8)
-    }
-}
-
-/// The 340 pt cover stack with parallax: translates by half the scroll offset and fades out over 600 pt (read with
-/// `visualEffect`, so scrolling never re-renders the screen).
-private struct MixHeader: View {
-    let title: LocalizedStringKey
-    let songs: [Song]
-    let titleLeading: CGFloat
-    let showsAIButton: Bool
-
-    @Environment(\.appTheme) private var theme
-    @Environment(Router.self) private var router
-
-    var body: some View {
-        let arts = distinctArt(songs)
-        let totalDuration = songs.reduce(Int64(0)) { $0 + $1.duration }
-        ZStack(alignment: .bottom) {
-            HStack(spacing: -80) {
-                ForEach(Array(arts.enumerated()), id: \.offset) { index, song in
-                    let size: CGFloat = index == 1 ? 220 : 180
-                    // Android's Material shapes (star / circle / rounded square) become a rounded square, a circle
-                    // and a rounded square.
-                    let radius: CGFloat = index == 1 ? size / 2 : (index == 0 ? 52 : 30)
-                    ArtworkView(song: song, size: size, cornerRadius: radius)
-                        .rotationEffect(.degrees(index == 0 ? -15 : (index == 2 ? 15 : 0)))
-                        .zIndex(index == 1 ? 0 : Double(index))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            LinearGradient(stops: [.init(color: theme.surface.opacity(0.1), location: 0),
-                                   .init(color: .clear, location: 0.25),
-                                   .init(color: theme.surface.opacity(0.5), location: 0.5),
-                                   .init(color: theme.surface.opacity(0.9), location: 0.75),
-                                   .init(color: theme.surface, location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .pixlFont(.custom(size: 44, weight: .bold))
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text(HomeLogic.songsDotDuration(count: songs.count, durationMs: totalDuration))
-                        .pixlFont(.bodyMedium)
-                        .foregroundStyle(theme.onSurface.opacity(0.8))
-                        .padding(.leading, 3)
-                }
-                Spacer()
-                if showsAIButton {
-                    // Android: a large star-shaped FAB opening the AI playlist sheet (`showAiPlaylistSheet`).
-                    GlassCircleButton(systemImage: "sparkles", accessibilityLabel: "AI Playlist Generator", size: 96,
-                                      iconSize: 22, tint: theme.primaryContainer.opacity(GlassTint.prominent),
-                                      foreground: theme.onPrimaryContainer) {
-                        router.present(AppSheet.aiPlaylist)
-                    }
-                    .accessibilityIdentifier("dailyMix.ai")
-                }
-            }
-            .padding(.leading, titleLeading)
-            .padding(.trailing, 22)
-        }
-        .frame(height: 340) // not clipped: Android's header box isn't, so the 96 pt button keeps its full glass
-        .visualEffect { content, proxy in
-            let offset = max(-proxy.frame(in: .scrollView).minY, 0)
-            return content
-                .offset(y: offset * 0.5)
-                .opacity(Double(min(max(1 - offset / 600, 0), 1)))
-        }
-    }
-
-    private func distinctArt(_ songs: [Song]) -> [Song] {
-        var seen = Set<String>()
-        var result: [Song] = []
-        for song in songs where result.count < 3 {
-            let key = song.albumArtUriString ?? ""
-            if seen.insert(key).inserted { result.append(song) }
-        }
-        return result
     }
 }
 
@@ -336,31 +231,5 @@ struct MixPlayShuffleRow: View {
         }
         .buttonStyle(.plain)
         .glassEffect(Glass.regular.tint(tint).interactive(), in: shape)
-    }
-}
-
-/// First Listen's note for the week (Android `MixDetailScreen`'s "This week" block): a small label and two or three sentences. The text is the
-/// template over the list, or the cloud assistant's answer when it passed the evidence check (`WeeklyNote.check`); either way it is true of
-/// the list shown.
-private struct MixWeeklyNote: View {
-    let text: String
-
-    @Environment(\.appTheme) private var theme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(BrainStrings.weeklyNoteTitle)
-                .pixlFont(.labelLarge)
-                .foregroundStyle(theme.primary)
-            Text(text)
-                .pixlFont(.bodyLarge)
-                .foregroundStyle(theme.onSurface)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("mixDetail.weeklyNote")
     }
 }

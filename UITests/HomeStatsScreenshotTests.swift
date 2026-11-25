@@ -13,11 +13,15 @@ final class HomeStatsScreenshotTests: XCTestCase {
     func testHomeShelvesLight() throws { try capture("home", "light", name: "home7b-shelves", swipes: 2) }
     func testHomeShelvesDark() throws { try capture("home", "dark", name: "home7b-shelves", swipes: 2) }
     func testHomeBottomLight() throws { try capture("home", "light", name: "home7b-bottom", swipes: 8) }
-    func testHomeGreetingExpandedLight() throws {
-        try capture("home", "light", name: "home7b-insight") { app in
-            app.descendants(matching: .any)["home.greeting.expand"].firstMatch.tap()
-        }
-    }
+    /// Redesign batch 3: one swipe up shows the collapsed header (the greeting card and its insight are gone).
+    func testHomeCollapsedHeaderLight() throws { try capture("home", "light", name: "home3-collapsed", swipes: 1) }
+
+    // MARK: Endless Listening (redesign batch 3)
+
+    func testEndlessIntroLight() throws { try capture("endlessIntro", "light") }
+    func testEndlessIntroDark() throws { try capture("endlessIntro", "dark") }
+    func testEndlessStationLight() throws { try capture("endlessStation", "light") }
+    func testEndlessStationDark() throws { try capture("endlessStation", "dark") }
 
     // MARK: Pushed screens
 

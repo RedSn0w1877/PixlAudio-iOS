@@ -3,35 +3,47 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// Home (Android `HomeScreen`): the top row (Beta chip; the active-jobs capsule, changelog and settings circles) over a scrolling
-/// column, 24 pt apart — greeting card, quick actions, "Made for your listening", Your Mix, the discovery shelves,
-/// Just added, Recently Played and the listening stats card. Every Material surface is Liquid Glass with the
-/// colour Android filled it with as the tint; layout and sizes are the Compose values (1 dp = 1 pt).
+/// Home, redesign batch 3 (Android `HomeScreen` + `redesign/HomeRedesign.kt`, mockups Main and AndroidHomeScrolled): a flat page,
+/// blocks 20 pt apart, 16 pt gutter. Order: the header (time chip, the wordplay greeting, Ask Taizo / Settings / jobs), the safe-mode
+/// banner, the listening-history card, the knowing strip, the artist picker, Your mix, Endless Listening, Mix & match, the plan's hero,
+/// Rewind replay, Fresh finds (and the other track shelves in the same style), the station shelves, the legacy adaptive mixes, Just
+/// added, the Ask Taizo card, the stats card and the footer links. Once the big header scrolls away, the collapsed header slides in.
+/// Material fills are Liquid Glass tinted with Android's role (`HomeRedesign.swift`).
 struct HomeView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
     @Environment(PlaybackStore.self) private var playback
     @Environment(Router.self) private var router
     @Environment(\.appTheme) private var theme
-    /// A reference: writing the flag re-renders only the top bar that reads it, never this body (and its sections).
+    /// A reference: writing the flag re-renders only the collapsed header's slot, never this body (and its sections).
     @State private var scroll = HomeScrollState()
-    /// Which of the new Home's views the chips pick (docs/brain-spec.md, 8.1).
-    @State private var chip: HomeChip = .forYou
+    /// "See all" of Mix & match (the old "Mixes" chip) and of Fresh finds (the old "New" chip).
+    @State private var showAllMixes = false
+    @State private var showNewShelves = false
 
     var body: some View {
         let home = env.home
         let content = home.content
         // The music brain's plan (8.1): read from its file before anything else. `owned` false is the page as it was.
         let plan = env.homePlan.ui
+        let week = content.statsOverview.flatMap { $0.range == .week ? $0 : nil }
+        let topSong = week?.topSongs.first
+        let titles = HomeSectionTitles.make(now: Date(), pinned: env.launch.isUITest)
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                HomeRedesignHeader(weekPlays: week?.totalPlayCount, topSong: topSong?.title, topSongPlays: topSong?.playCount ?? 0,
+                                   onAskTaizo: { router.present(AppSheet.taisChat) },
+                                   onSettings: { router.push(.settings) },
+                                   onJobs: { router.present(AppSheet.jobs) })
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { scroll.headerHeight = $0 }
+
                 // After an unexpected close: heavy jobs are paused until the person reviews them (once, dismissible).
                 if env.health.safeMode.showsBanner {
                     SafeModeBanner(modelBlamed: env.health.localModelBlamed, onReview: {
                         env.health.dismissBanner()
                         router.present(AppSheet.jobs)
                     }, onDismiss: { env.health.dismissBanner() })
-                        .padding(.horizontal, HomeMetrics.greetingInset)
+                        .padding(.horizontal, Redesign.gutter)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 // Once, until a data download is imported or the card is closed: the listening-history import.
@@ -39,29 +51,64 @@ struct HomeView: View {
                     ListeningHistoryHomeCard(onOpen: { router.push(.listeningHistory) }, onDismiss: {
                         withAnimation(PixlMotion.state) { env.importedHistory.homeCardDismissed = true }
                     })
-                    .padding(.horizontal, HomeMetrics.greetingInset)
+                    .padding(.horizontal, Redesign.gutter)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                if plan.owned && !plan.dateLine.isEmpty { HomeDateLine(text: plan.dateLine) }
-                HomeGreetingCard(greeting: content.greeting, insight: home.aiInsight ?? content.insight,
-                                 isExpanded: home.isInsightExpanded, isLoadingInsight: home.isLoadingInsight,
-                                 onToggle: { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { home.toggleInsight() } })
-                    .padding(.horizontal, HomeMetrics.greetingInset)
-
-                HomeQuickActionsRow(
-                    onShuffleAll: { shuffleAll() },
-                    onRecentlyPlayed: { router.push(.recentlyPlayed) },
-                    onStats: { router.push(.stats) })
-
                 // 8.10: while the first radios are fetched Home says so; it never shows a spinner or an empty state for it.
                 if plan.knowingTotal > 0 { HomeKnowingStrip(done: plan.knowingDone, total: plan.knowingTotal) }
                 if plan.offerPicker { HomeArtistPickerCard(onPick: { router.push(.artistPicker) }) }
-                if plan.owned {
-                    HomeChipsRow(selected: activeChip(plan), chips: offeredChips(plan), onSelect: { picked in
-                        if picked == .spatial { router.push(.cloudProcessing) } else { chip = picked }
-                    })
+
+                // Your mix: the day's hero card. Without one (and no plan) the old loading / empty states keep their place.
+                if !content.yourMix.isEmpty || hasPlanYourMix(plan) {
+                    HomeYourMixHero(onOpen: { router.push(.yourMix) }, onPlay: content.yourMix.isEmpty ? nil : { playYourMix(content) })
+                } else if !plan.owned {
+                    yourMixPlaceholder(isPreparing: home.isPreparing)
                 }
-                if plan.owned || !plan.tiles.isEmpty { planItems(plan) }
+
+                HomeEndlessEntry(onTap: openEndless, onLongPress: { router.present(AppCover.endlessIntro) })
+
+                let tiles = mixTiles(plan: plan, content: content)
+                if !tiles.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HomeSectionHeader(wide: titles.mixesA, accent: titles.mixesB,
+                                          actionLabel: tiles.count > 2
+                                              ? (showAllMixes ? HomeRedesignStrings.showLess : HomeRedesignStrings.seeAll) : nil,
+                                          onAction: { withAnimation(PixlMotion.state) { showAllMixes.toggle() } })
+                        if showAllMixes {
+                            HomeMixGrid(tiles: tiles, onOpen: { openMixTile($0, plan: plan) })
+                        } else {
+                            HomeMixShelfRow(tiles: tiles, onOpen: { openMixTile($0, plan: plan) })
+                        }
+                    }
+                }
+
+                if plan.owned, let hero = plan.hero {
+                    HomeHeroCard(hero: hero, onTap: { openHero(hero) })
+                }
+
+                let rewind = rewindTiles(plan: plan, content: content)
+                if !rewind.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HomeSectionHeader(wide: titles.recentA, accent: titles.recentB,
+                                          actionLabel: content.recentlyPlayed.isEmpty ? nil : HomeRedesignStrings.seeAll,
+                                          onAction: { router.push(.recentlyPlayed) })
+                        HomeRewindGrid(tiles: rewind, onTap: { openRewind($0, plan: plan, content: content) })
+                    }
+                }
+
+                trackShelves(plan: plan, content: content, titles: titles)
+
+                if plan.owned {
+                    ForEach(stationShelves(plan)) { shelf in
+                        if case .stations(let id, let title, let subtitle, let cards) = shelf {
+                            HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
+                                env.homePlan.shelfActivated(id)
+                                env.brainActions.startGenreStation(kind: card.kind, atlasId: card.atlasId, name: card.name)
+                            })
+                            .shelfSeen(id, env.homePlan)
+                        }
+                    }
+                }
 
                 if !plan.owned, !content.mixes.isEmpty {
                     HomeDiscoveryMixes(mixes: content.mixes, isRefreshing: home.isRefreshing,
@@ -74,69 +121,44 @@ struct HomeView: View {
                                        onPlay: { section, song in playback.play(song, in: section.songs, source: .homeShelf) })
                 }
 
-                // The plan's "Made for you" shelf holds Your Mix: the legacy block, its placeholders included, is not drawn.
-                if !plan.owned { yourMix(content: content, isPreparing: home.isPreparing) }
-
-                // The music brain's "Because you listened to X" rows (docs/brain-spec.md, 8.1): music the listener does
-                // not have yet, in front of the legacy shelves. A card plays with the row as the queue. The plan carries
-                // these rows itself when it owns Home.
-                ForEach(plan.owned ? [] : home.brainShelves) { shelf in
-                    CurrentSongState { currentSongId in
-                        HomeDiscoveryShelf(section: shelf.section, currentSongId: currentSongId,
-                                           onPlay: { song in env.brainActions.play(shelf, startingAt: song) })
-                    }
-                }
-
-                ForEach(plan.owned ? [] : content.shelves) { section in
-                    CurrentSongState { currentSongId in
-                        HomeDiscoveryShelf(section: section, currentSongId: currentSongId,
-                                           onPlay: { song in playback.play(song, in: section.songs, source: .homeShelf) })
-                    }
-                }
-
                 if !content.recentlyAdded.isEmpty {
                     RecentlyAddedSection(songs: content.recentlyAdded,
                                          onSongTap: { song in playback.play(song, in: library.songs) })
                 }
 
-                if content.recentlyPlayed.count >= HomeLogic.recentlyPlayedMinSongs {
-                    let items = content.recentlyPlayed
-                    CurrentSongState { currentSongId in
-                        RecentlyPlayedSection(items: items, currentSongId: currentSongId,
-                                              onSongTap: { song in playback.play(song, in: items.map(\.song)) },
-                                              onOpenAll: { router.push(.recentlyPlayed) })
-                    }
-                }
+                HomeAskTaizoCard(exampleSong: topSong?.title ?? playback.current?.title,
+                                 onTap: { router.present(AppSheet.taisChat) })
 
                 if let overview = content.statsOverview {
                     StatsOverviewCard(summary: overview, onOpen: { router.push(.stats) })
                 }
+
+                HomeFooterLinks(links: footerLinks)
             }
             .padding(.bottom, 38)
-            // Nothing is drawn below the top bar until the saved plan has been looked for (a frame or two): the old rows are
-            // never painted and then swapped out for the plan, and the plan fades in. UI tests draw at once.
+            // Nothing is drawn until the saved plan has been looked for (a frame or two): the old rows are never painted and then
+            // swapped out for the plan, and the plan fades in. UI tests draw at once.
             .opacity(plan.resolved || env.launch.isUITest ? 1 : 0)
             .animation(.easeOut(duration: 0.12), value: plan.resolved)
         }
         .scrollIndicators(.hidden)
-        // Only the scroll view carries the screen id. Applied after the top-bar inset below, it overwrote the
-        // identifiers of the Beta, jobs, changelog and settings buttons (UI tests saw all four as `screen.home`).
         .accessibilityIdentifier("screen.home")
         .minimizesTabBarOnScroll()
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top > HomeMetrics.scrolledThreshold
+        // The collapsed header shows once the big header has scrolled off (Android `firstVisibleItemIndex > 0`).
+        .onScrollGeometryChange(for: Bool.self) { [scroll] geometry in
+            let header = scroll.headerHeight > 0 ? scroll.headerHeight : HomeMetrics.scrolledThreshold
+            return geometry.contentOffset.y + geometry.contentInsets.top > header
         } action: { _, scrolled in
             if scroll.isScrolled != scrolled { scroll.isScrolled = scrolled }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HomeTopBar(scroll: scroll,
-                       onBeta: { router.present(AppSheet.betaInfo) },
-                       onJobs: { router.present(AppSheet.jobs) },
-                       onAskTaizo: { router.present(AppSheet.taisChat) },
-                       onChangelog: { router.present(AppSheet.changelog) },
-                       onSettings: { router.push(.settings) })
+        .overlay(alignment: .top) {
+            HomeCollapsedSlot(scroll: scroll, weekPlays: week?.totalPlayCount, topSong: topSong?.title,
+                              topSongPlays: topSong?.playCount ?? 0,
+                              onAskTaizo: { router.present(AppSheet.taisChat) },
+                              onSettings: { router.push(.settings) },
+                              onJobs: { router.present(AppSheet.jobs) })
         }
-        .background(theme.background.ignoresSafeArea())
+        .background(theme.surface.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .task(id: HomeRefreshKey(libraryRevision: library.songsRevision, revision: home.history.revision,
                                  importedRevision: env.importedHistory.revision,
@@ -177,118 +199,99 @@ struct HomeView: View {
         return !env.launch.isUITest && !history.homeCardDismissed && !history.hasFileImport && !library.songs.isEmpty
     }
 
-    // MARK: Your Mix
+    // MARK: Your mix
 
     @ViewBuilder
-    private func yourMix(content: HomeContent, isPreparing: Bool) -> some View {
-        let songs = content.yourMix
-        if songs.isEmpty {
-            if isPreparing {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(theme.primary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 256)
-            } else if env.accounts.needsSpotifyConnection {
-                // No account linked: nothing will ever sync, so Home asks to connect (as Library does).
-                ConnectSpotifyEmptyState()
-            } else {
-                YourMixEmptyPlaceholder(onRefresh: {
-                    Task {
-                        try? await library.refresh()
-                        await env.home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision,
-                                               force: true)
-                    }
-                })
-            }
+    private func yourMixPlaceholder(isPreparing: Bool) -> some View {
+        if isPreparing {
+            ProgressView()
+                .controlSize(.large)
+                .tint(theme.primary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 256)
+        } else if env.accounts.needsSpotifyConnection {
+            // No account linked: nothing will ever sync, so Home asks to connect (as Library does).
+            ConnectSpotifyEmptyState()
         } else {
-            let fallback = content.usesFallbackYourMix
-            PlaybackState { currentSongId, isPlaying, isShuffleEnabled in
-                YourMixShelfSection(
-                    songs: songs,
-                    currentSongId: currentSongId,
-                    isPlaying: isPlaying,
-                    isShuffleEnabled: isShuffleEnabled,
-                    onPlayShuffled: {
-                        if fallback { shuffleAll() } else { playback.play(songs.shuffled()) }
-                    },
-                    onSongTap: { song in playback.play(song, in: fallback ? library.songs : songs) },
-                    onMore: { song in router.present(AppSheet.songInfo(songId: song.id)) },
-                    onCheckOut: { router.push(.yourMix) })
-            }
-        }
-    }
-
-    // MARK: The brain's plan (docs/brain-spec.md, 8.1)
-
-    /// The new Home's rows: the hero, Jump back in, then the shelves of the plan in the plan's order; the chips pick what
-    /// shows. Without a plan only Jump back in is drawn, and the library rows below it carry the page.
-    @ViewBuilder
-    private func planItems(_ plan: HomePlanUi) -> some View {
-        if !plan.owned {
-            HomeJumpBackIn(tiles: plan.tiles, onTile: openTile)
-        } else {
-            switch activeChip(plan) {
-            case .mixes:
-                HomeAllMixes(cards: plan.allMixes, onOpen: openMix)
-            case .new:
-                planShelves(plan.newShelves)
-            default:
-                if let hero = plan.hero { HomeHeroCard(hero: hero, onTap: { openHero(hero) }) }
-                HomeJumpBackIn(tiles: plan.tiles, onTile: openTile)
-                planShelves(plan.shelves)
-            }
-        }
-    }
-
-    /// "Mixes" and "New" are offered only when there is something behind them.
-    private func offeredChips(_ plan: HomePlanUi) -> [HomeChip] {
-        HomeChip.allCases.filter { chip in
-            switch chip {
-            case .mixes: !plan.allMixes.isEmpty
-            case .new: !plan.newShelves.isEmpty
-            default: true
-            }
-        }
-    }
-
-    /// The chip the page shows: a remembered chip whose content has gone falls back to "For you".
-    private func activeChip(_ plan: HomePlanUi) -> HomeChip { offeredChips(plan).contains(chip) ? chip : .forYou }
-
-    @ViewBuilder
-    private func planShelves(_ shelves: [HomeShelfUi]) -> some View {
-        ForEach(shelves) { shelf in
-            switch shelf {
-            case .tracks(let tracks):
-                CurrentSongState { currentSongId in
-                    HomeDiscoveryShelf(section: tracks.section, currentSongId: currentSongId,
-                                       onPlay: { song in
-                                           env.homePlan.shelfActivated(tracks.id)
-                                           env.brainActions.play(tracks, startingAt: song)
-                                       })
+            YourMixEmptyPlaceholder(onRefresh: {
+                Task {
+                    try? await library.refresh()
+                    await env.home.refresh(snapshot: library.snapshot, libraryRevision: library.songsRevision, force: true)
                 }
-                .shelfSeen(shelf.id, env.homePlan)
-            case .mixes(let id, let title, let subtitle, let cards):
-                HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: { card in
-                    env.homePlan.shelfActivated(id)
-                    openMix(card)
-                }, onEndlessHowItWorks: { router.present(AppCover.endlessIntro) })
-                .shelfSeen(shelf.id, env.homePlan)
-            case .stations(let id, let title, let subtitle, let cards):
-                HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
-                    env.homePlan.shelfActivated(id)
-                    env.brainActions.startGenreStation(kind: card.kind, atlasId: card.atlasId, name: card.name)
-                })
-                .shelfSeen(shelf.id, env.homePlan)
+            })
+        }
+    }
+
+    private func hasPlanYourMix(_ plan: HomePlanUi) -> Bool {
+        plan.allMixes.contains { $0.mixId == "your" } || plan.shelves.contains { shelf in
+            if case .mixes(_, _, _, let cards) = shelf { return cards.contains { $0.mixId == "your" } }
+            return false
+        }
+    }
+
+    /// Android: the fallback mix shuffles the whole library; otherwise the mix plays from its first song.
+    private func playYourMix(_ content: HomeContent) {
+        let songs = content.yourMix
+        guard let first = songs.first else { return }
+        if content.usesFallbackYourMix { shuffleAll() } else { playback.play(first, in: songs, source: .yourMix) }
+    }
+
+    // MARK: Endless Listening
+
+    /// First open shows the introduction; every other starts (or picks up) the station and opens its screen.
+    private func openEndless() {
+        env.homePlan.shelfActivated("made_for_you")
+        if env.endless.isIntroSeen {
+            if !env.endless.isActive { env.brainActions.startEndless() }
+            router.present(AppCover.endlessStation)
+        } else {
+            router.present(AppCover.endlessIntro)
+        }
+    }
+
+    // MARK: Mix & match
+
+    /// Every made-for-you card except Your Mix (the hero) and Endless Listening (its own pill), in the plan's order.
+    private func planMixCards(_ plan: HomePlanUi) -> [MixCardUi] {
+        var seen = Set<String>()
+        var out: [MixCardUi] = []
+        for shelf in plan.shelves {
+            if case .mixes(_, _, _, let cards) = shelf {
+                for card in cards where seen.insert(card.mixId).inserted { out.append(card) }
             }
+        }
+        for card in plan.allMixes where seen.insert(card.mixId).inserted { out.append(card) }
+        return out.filter { $0.mixId != "your" && $0.kind != MixKinds.endless }
+    }
+
+    private func mixTiles(plan: HomePlanUi, content: HomeContent) -> [HomeMixTile] {
+        let cards = planMixCards(plan)
+        if plan.owned || !cards.isEmpty {
+            return cards.map { HomeMixTile(key: $0.mixId, title: $0.title, subtitle: $0.subtitle) }
+        }
+        guard !content.dailyMix.isEmpty else { return [] }
+        var seen = Set<String>()
+        var artists: [String] = []
+        for song in content.dailyMix where artists.count < 3 {
+            let name = song.displayArtist
+            if !name.isEmpty, seen.insert(name).inserted { artists.append(name) }
+        }
+        return [HomeMixTile(key: "daily", title: BrainStrings.mixDaily, subtitle: artists.joined(separator: ", "))]
+    }
+
+    private func openMixTile(_ tile: HomeMixTile, plan: HomePlanUi) {
+        if let card = planMixCards(plan).first(where: { $0.mixId == tile.key }) {
+            env.homePlan.shelfActivated("made_for_you")
+            openMix(card)
+        } else {
+            openMix(id: tile.key)
         }
     }
 
     /// A card of "Made for you" was tapped (8.2): Daily Mix 1 and Your Mix have their own screens, the others open the list.
     private func openMix(_ card: MixCardUi) {
-        // Endless Listening is a station: its first open shows the introduction, every other starts it or picks it up.
         if card.kind == MixKinds.endless {
-            if env.endless.isIntroSeen { env.brainActions.startEndless() } else { router.present(AppCover.endlessIntro) }
+            openEndless()
             return
         }
         openMix(id: card.mixId, isFirstDaily: card.kind == MixKinds.daily && card.number == 1)
@@ -313,13 +316,126 @@ struct HomeView: View {
         }
     }
 
-    private func openTile(_ tile: TileUi) {
-        if !tile.mixId.isEmpty {
-            openMix(id: tile.mixId)
+    // MARK: Rewind, replay
+
+    /// The places played from (the plan's tiles), or the last six songs when there are none.
+    private func rewindTiles(plan: HomePlanUi, content: HomeContent) -> [HomeRewindTile] {
+        if !plan.tiles.isEmpty {
+            return plan.tiles.map { HomeRewindTile(key: $0.key, title: $0.title, art: $0.art) }
+        }
+        return content.recentlyPlayed.prefix(6).map {
+            HomeRewindTile(key: "song:" + $0.song.id, title: $0.song.title, art: $0.song.albumArtUriString)
+        }
+    }
+
+    private func openRewind(_ tile: HomeRewindTile, plan: HomePlanUi, content: HomeContent) {
+        if let planTile = plan.tiles.first(where: { $0.key == tile.key }) {
+            if !planTile.mixId.isEmpty {
+                openMix(id: planTile.mixId)
+                return
+            }
+            let songs = planTile.songIds.compactMap { library.song(id: $0) }
+            if let first = songs.first { playback.play(first, in: songs, source: .homeShelf) }
             return
         }
-        let songs = tile.songIds.compactMap { library.song(id: $0) }
-        if let first = songs.first { playback.play(first, in: songs, source: .homeShelf) }
+        let queue = content.recentlyPlayed.map(\.song)
+        if let song = queue.first(where: { "song:" + $0.id == tile.key }) { playback.play(song, in: queue) }
+    }
+
+    // MARK: Track shelves
+
+    /// "Fresh finds" is the first track shelf; the others follow it in the same style. "See all" of Fresh finds shows the plan's
+    /// "New" shelves under it.
+    @ViewBuilder
+    private func trackShelves(plan: HomePlanUi, content: HomeContent, titles: HomeSectionTitles) -> some View {
+        let shelves = trackSections(plan: plan, content: content)
+        ForEach(Array(shelves.enumerated()), id: \.element.id) { index, shelf in
+            VStack(alignment: .leading, spacing: 12) {
+                if index == 0 {
+                    HomeSectionHeader(wide: titles.freshA, accent: titles.freshB, subtitle: HomeRedesignStrings.freshSubtitle,
+                                      actionLabel: plan.newShelves.isEmpty ? nil
+                                          : (showNewShelves ? HomeRedesignStrings.showLess : HomeRedesignStrings.seeAll),
+                                      onAction: { withAnimation(PixlMotion.state) { showNewShelves.toggle() } })
+                } else {
+                    HomeSectionHeader(wide: shelf.section.title, accent: "", subtitle: shelf.section.subtitle)
+                }
+                HomeFreshRow(songs: shelf.section.songs, onPlay: { song in playShelf(shelf, song: song, owned: plan.owned) })
+            }
+            .shelfSeenIf(plan.owned, shelf.id, env.homePlan)
+            if index == 0 && showNewShelves {
+                planShelves(plan.newShelves)
+            }
+        }
+    }
+
+    /// One track shelf of the page: the plan's (owned) or the library's (brain rows first, then the discovery shelves).
+    private struct TrackShelf: Identifiable {
+        let id: String
+        let section: HomeMusicSection
+        let brain: BrainHomeShelf?
+    }
+
+    private func trackSections(plan: HomePlanUi, content: HomeContent) -> [TrackShelf] {
+        if plan.owned {
+            return plan.shelves.compactMap { shelf in
+                if case .tracks(let tracks) = shelf { return TrackShelf(id: tracks.id, section: tracks.section, brain: tracks) }
+                return nil
+            }
+        }
+        return env.home.brainShelves.map { TrackShelf(id: "brain." + $0.id, section: $0.section, brain: $0) }
+            + content.shelves.map { TrackShelf(id: "lib." + $0.id, section: $0, brain: nil) }
+    }
+
+    private func playShelf(_ shelf: TrackShelf, song: Song, owned: Bool) {
+        if let brain = shelf.brain {
+            if owned { env.homePlan.shelfActivated(brain.id) }
+            env.brainActions.play(brain, startingAt: song)
+        } else {
+            playback.play(song, in: shelf.section.songs, source: .homeShelf)
+        }
+    }
+
+    private func stationShelves(_ plan: HomePlanUi) -> [HomeShelfUi] {
+        plan.shelves.filter { if case .stations = $0 { return true } else { return false } }
+    }
+
+    /// The plan's "New" shelves in their old look (the old "New" chip).
+    @ViewBuilder
+    private func planShelves(_ shelves: [HomeShelfUi]) -> some View {
+        ForEach(shelves) { shelf in
+            switch shelf {
+            case .tracks(let tracks):
+                CurrentSongState { currentSongId in
+                    HomeDiscoveryShelf(section: tracks.section, currentSongId: currentSongId,
+                                       onPlay: { song in
+                                           env.homePlan.shelfActivated(tracks.id)
+                                           env.brainActions.play(tracks, startingAt: song)
+                                       })
+                }
+            case .mixes(let id, let title, let subtitle, let cards):
+                HomeMixShelf(title: title, subtitle: subtitle, cards: cards, onOpen: { card in
+                    env.homePlan.shelfActivated(id)
+                    openMix(card)
+                }, onEndlessHowItWorks: { router.present(AppCover.endlessIntro) })
+            case .stations(let id, let title, let subtitle, let cards):
+                HomeStationShelf(title: title, subtitle: subtitle, cards: cards, onStart: { card in
+                    env.homePlan.shelfActivated(id)
+                    env.brainActions.startGenreStation(kind: card.kind, atlasId: card.atlasId, name: card.name)
+                })
+            }
+        }
+    }
+
+    // MARK: Footer
+
+    private var footerLinks: [HomeFooterLink] {
+        [
+            HomeFooterLink(id: "spatial", label: HomeRedesignStrings.spatialEntry) { router.push(.cloudProcessing) },
+            HomeFooterLink(id: "shuffleAll", label: HomeRedesignStrings.shuffleAllLink) { shuffleAll() },
+            HomeFooterLink(id: "stats", label: HomeRedesignStrings.statsLink) { router.push(.stats) },
+            HomeFooterLink(id: "whatsNew", label: HomeRedesignStrings.whatsNew) { router.present(AppSheet.changelog) },
+            HomeFooterLink(id: "beta", label: HomeRedesignStrings.betaInfo) { router.present(AppSheet.betaInfo) },
+        ]
     }
 
     /// Android `shuffleAllSongs(queueName = "Shuffle All")`.
@@ -328,7 +444,6 @@ struct HomeView: View {
         guard !songs.isEmpty else { return }
         playback.play(songs.shuffled())
     }
-
 }
 
 /// What Home's data depends on (the task re-runs when either changes): the library by its revision, not the whole
@@ -342,98 +457,44 @@ private struct HomeRefreshKey: Equatable {
     var adjustmentsRevision = 0
 }
 
-/// Home geometry from the Compose code.
+/// Home geometry.
 nonisolated enum HomeMetrics {
-    /// `navBarEdgeInset(DEFAULT)` with a gesture-nav inset: 16 dp.
+    /// The side gutter (redesign: 16 pt).
     static let greetingInset: CGFloat = 16
-    /// `isScrolledPastThreshold`: the greeting card has scrolled away.
-    static let scrolledThreshold: CGFloat = 110
-    /// Home top bar (`HomeGradientTopBar`): 64 pt; Beta pill starts 20 pt in (12 + 4 + 4), actions end 18 pt in.
-    static let topBarHeight: CGFloat = 64
-    static let topBarLeading: CGFloat = 20
-    static let topBarTrailing: CGFloat = 18
+    /// Until the header was measured: how far Home scrolls before the collapsed header shows.
+    static let scrolledThreshold: CGFloat = 200
 }
 
-// MARK: - Top bar
-
-/// Whether Home is scrolled past the top bar's threshold; observed only by `HomeTopBar` (like Stats' collapse state).
+/// Whether Home is scrolled past its big header; observed only by the collapsed header's slot. `headerHeight` is read by the scroll
+/// geometry's transform, never by a body.
 @Observable
 final class HomeScrollState {
     var isScrolled = false
+    @ObservationIgnored var headerHeight: CGFloat = 0
 }
 
-/// Android `HomeGradientTopBar`: transparent over the list; once scrolled, a `surfaceContainerHighest` scrim fades in
-/// behind it (solid to 55 %, 72 % at 80 %, clear at the bottom) reaching the top of the screen.
-private struct HomeTopBar: View {
+/// The slot of the collapsed header: it alone reads the scroll flag, and draws the header only while it is shown (a spring in and out:
+/// fade and 24 pt slide, Android's medium-low stiffness).
+private struct HomeCollapsedSlot: View {
     let scroll: HomeScrollState
-    let onBeta: () -> Void
-    let onJobs: () -> Void
-    /// Ask Taizo (2026-10-23): the assistant, one tap from Home.
+    let weekPlays: Int?
+    let topSong: String?
+    let topSongPlays: Int
     let onAskTaizo: () -> Void
-    let onChangelog: () -> Void
     let onSettings: () -> Void
+    let onJobs: () -> Void
 
-    @Environment(AppEnvironment.self) private var env
-    @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // The count is read here, not in HomeView: `ActiveJobs` writes it only when the number changes, so a scan or a
-        // transfer reporting progress never re-runs this bar, and Home's shelves (alive under the other tabs) never
-        // see it.
-        let activeJobs = env.activeJobs
-        let jobCount = activeJobs.badgeCount
-        GlassEffectContainer(spacing: 2) {
-            HStack(spacing: 0) {
-                Button(action: onBeta) {
-                    HStack(spacing: 8) {
-                        Text(verbatim: "β").pixlFont(.titleSmall, weight: .black)
-                        Text("Beta").pixlFont(.titleSmall, weight: .semibold)
-                    }
-                    .foregroundStyle(theme.onSurface)
-                    .padding(.horizontal, 14)
-                    .frame(height: Tokens.TopBar.circleButtonSize)
-                    .contentShape(.capsule)
-                }
-                .buttonStyle(.plain)
-                .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
-                .accessibilityIdentifier("home.beta")
-
-                Spacer(minLength: Tokens.Spacing.s)
-
-                HStack(spacing: Tokens.TopBar.actionSpacing) {
-                    if jobCount > 0 {
-                        ActiveJobsButton(count: jobCount, isWorking: activeJobs.isWorking, action: onJobs,
-                                         onCancelAll: { activeJobs.cancelAll() })
-                            .transition(.scale(scale: 0.85).combined(with: .opacity))
-                    }
-                    GlassCircleButton(systemImage: "sparkles", accessibilityLabel: "Ask Taizo",
-                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onAskTaizo)
-                        .accessibilityIdentifier("ai.taizo.home")
-                    GlassCircleButton(systemImage: "newspaper", accessibilityLabel: "Changelog",
-                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onChangelog)
-                        .accessibilityIdentifier("home.changelog")
-                    GlassCircleButton(systemImage: "gearshape", accessibilityLabel: "Settings",
-                                      tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), action: onSettings)
-                        .accessibilityIdentifier("home.settings")
-                }
+        ZStack(alignment: .top) {
+            if scroll.isScrolled {
+                HomeCollapsedHeader(weekPlays: weekPlays, topSong: topSong, topSongPlays: topSongPlays,
+                                    onAskTaizo: onAskTaizo, onSettings: onSettings, onJobs: onJobs)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -24)))
             }
-            .padding(.leading, HomeMetrics.topBarLeading)
-            .padding(.trailing, HomeMetrics.topBarTrailing)
-            .frame(height: HomeMetrics.topBarHeight)
         }
-        // The jobs button appears and goes with a short spring (not while it only changes its count).
-        .animation(PixlMotion.bars, value: jobCount > 0)
-        .background(alignment: .top) {
-            let scrim = theme.surfaceContainerHighest
-            LinearGradient(stops: [.init(color: scrim, location: 0), .init(color: scrim, location: 0.55),
-                                   .init(color: scrim.opacity(0.72), location: 0.8),
-                                   .init(color: scrim.opacity(0), location: 1)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea(edges: .top)
-                .opacity(scroll.isScrolled ? 1 : 0)
-                .animation(.easeInOut(duration: 0.3), value: scroll.isScrolled)
-                .allowsHitTesting(false)
-        }
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.42, dampingFraction: 1), value: scroll.isScrolled)
     }
 }
 
@@ -442,6 +503,15 @@ private extension View {
     /// goes, so a shelf scrolled past counts for nothing. One sleep and one call, off the main actor; nothing per frame.
     func shelfSeen(_ id: String, _ plan: HomePlanState) -> some View {
         task(id: id) {
+            try? await Task.sleep(for: .seconds(1))
+            if !Task.isCancelled { await MainActor.run { plan.shelfSeen(id) } }
+        }
+    }
+
+    /// `shelfSeen` for the plan's shelves only (the library's rows are not the bandit's).
+    func shelfSeenIf(_ on: Bool, _ id: String, _ plan: HomePlanState) -> some View {
+        task(id: on ? id : "") {
+            guard on else { return }
             try? await Task.sleep(for: .seconds(1))
             if !Task.isCancelled { await MainActor.run { plan.shelfSeen(id) } }
         }

@@ -121,6 +121,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
     case aiPlaylist, taisChat, taisChatConversation, aiPlaylistLab
     /// Song Tap (2026-11-20): the full-screen surface, switched off (the turn-on card).
     case songTap
+    /// Redesign batch 3: Endless Listening's introduction and station screen (covers).
+    case endlessIntro, endlessStation
     /// Ask Taizo with the scripted Claude (`DemoClaudeClient`, 2026-10-23): a streamed answer citing a page, then a
     /// 60-song playlist waiting for its Confirm tap.
     case taisChatCloud
@@ -281,6 +283,7 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
         case .settingsPlaybackSpatial: return .settingsCategory(.playback)
         case .howPicksWork, .whyThisSong: return nil
         case .songTap: return nil
+        case .endlessIntro, .endlessStation: return nil
         }
     }
 
@@ -376,6 +379,8 @@ nonisolated enum DemoScreen: String, Sendable, CaseIterable {
             .setup
         case .aiPlaylistLab: .aiPlaylistLab
         case .songTap: .songTap
+        case .endlessIntro: .endlessIntro
+        case .endlessStation: .endlessStation
         case .backupRestorePlan, .backupImportReport: .backupImport
         default: nil
         }

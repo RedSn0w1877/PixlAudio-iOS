@@ -101,6 +101,7 @@ struct CoverDestination: View {
             case .backupImport: BackupImportCover()
             case .backupExport: BackupExportCover()
             case .endlessIntro: EndlessIntroView()
+            case .endlessStation: EndlessStationView()
             case .songTap: SongTapView()
             }
         }

@@ -304,6 +304,9 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
     case backupExport
     /// Endless Listening's three-page introduction (first open of its card, the card's menu, Settings).
     case endlessIntro
+    /// Endless Listening's station screen (redesign batch 3, Android `Screen.EndlessStation`): now playing, the host's notes, ask the
+    /// host. A full screen of its own, like Android's (no nav bar, no mini player).
+    case endlessStation
     /// Song Tap (2026-11-20, Android `Screen.SongTap`): send the song that is playing to a phone nearby, or take one.
     case songTap
 
@@ -318,6 +321,7 @@ nonisolated enum AppCover: Hashable, Sendable, Identifiable {
         case .backupImport: "backupImport"
         case .backupExport: "backupExport"
         case .endlessIntro: "endlessIntro"
+        case .endlessStation: "endlessStation"
         case .songTap: "songTap"
         }
     }
