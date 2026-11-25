@@ -1,6 +1,7 @@
 import CoreGraphics
 import Observation
 import PixlLibrary
+import PixlModel
 import SwiftUI
 import UIKit
 
