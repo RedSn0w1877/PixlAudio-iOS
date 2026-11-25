@@ -53,6 +53,12 @@ public struct SongTapDiagSnapshot: Sendable, Equatable {
     public var names = ""
     /// What the one-sided tap did last: the other phone's tap message and the verdict (`SongTapPeerTapVerdict.code`), or "-".
     public var peerTap = "-"
+    /// Sender: the last tap that was felt but ignored ("tap ignored: no yes yet ..."), empty when none.
+    public var tapNote = ""
+    /// Sender: a tap was felt lately and nobody was said yes to, so the screens show "say yes first".
+    public var needsYes = false
+    /// How often the radio (advertising and scanning) was started since Song Tap was armed; more than one per screen visit means a restart.
+    public var radioStarts = 0
 
     public init() {}
 }
@@ -150,6 +156,7 @@ public final class SongTapDiagnostics {
         out += " dwellMin=\(SongTapTuning.dwellMinDbm)\n"
         out += "followed: gate \(s.gate), may connect and beam \(s.mayConnect ? "yes" : "no"), listed \(s.listed ? "yes" : "no"),"
         out += " offer in hand \(s.offerInHand ? "yes" : "no"), names \(s.names.isEmpty ? "-" : s.names), peer tap \(s.peerTap)\n"
+        out += "radio starts \(s.radioStarts), tap note: \(s.tapNote.isEmpty ? "-" : s.tapNote)\n"
         out += "last events (ms since boot, oldest first):\n"
         for e in events { out += "  \(e.tMs)  \(e.text)\n" }
         out += "recent signal (t, rssi, smoothed, baseline), oldest first:\n"

@@ -230,8 +230,13 @@ public final class SongTapEngine {
 
     public func arm(_ role: SongTapRole, askFirst: Bool) {
         guard ui.allowed else { return }
+        // Already armed as this role (a resume that follows no pause, a second screen): nothing to start, and the radio must not restart.
+        if session.role == role && Self.armedPhases.contains(session.phase) { return }
         dispatch(.arm(role: role, askFirst: askFirst))
     }
+
+    /// Phases in which Song Tap is already armed (arming again changes nothing).
+    public static let armedPhases: Set<SongTapPhase> = [.armed, .found, .near, .offered, .transferring]
 
     public func disarm() {
         dispatch(.disarm)
