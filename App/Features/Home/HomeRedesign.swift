@@ -1,3 +1,4 @@
+import PixlFoundation
 import PixlLibrary
 import PixlModel
 import SwiftUI
