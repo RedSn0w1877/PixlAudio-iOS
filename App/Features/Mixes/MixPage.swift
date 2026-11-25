@@ -29,9 +29,18 @@ private struct MixColors {
 
     init(_ tone: MixPageTone, _ theme: ThemeColors) {
         switch tone {
-        case .tertiary: (container, onContainer, accent) = (theme.tertiaryContainer, theme.onTertiaryContainer, theme.tertiary)
-        case .primary: (container, onContainer, accent) = (theme.primaryContainer, theme.onPrimaryContainer, theme.primary)
-        case .secondary: (container, onContainer, accent) = (theme.secondaryContainer, theme.onSecondaryContainer, theme.secondary)
+        case .tertiary:
+            container = theme.tertiaryContainer
+            onContainer = theme.onTertiaryContainer
+            accent = theme.tertiary
+        case .primary:
+            container = theme.primaryContainer
+            onContainer = theme.onPrimaryContainer
+            accent = theme.primary
+        case .secondary:
+            container = theme.secondaryContainer
+            onContainer = theme.onSecondaryContainer
+            accent = theme.secondary
         }
     }
 }
