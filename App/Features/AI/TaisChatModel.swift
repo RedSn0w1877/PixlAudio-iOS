@@ -669,6 +669,22 @@ final class TaisChatModel {
     }
 
     /// "New chat": the next prompt starts a new conversation.
+    /// Stop while Taizo answers (redesign 2, Android `stop`): the turn is cancelled, its thinking row goes and a
+    /// streaming answer keeps what arrived so far.
+    func stop() {
+        turnTask?.cancel()
+        turnTask = nil
+        resolveAllConfirmations(false)
+        messages = messages.compactMap { message in
+            switch message {
+            case .thinking: return nil
+            case .assistant(let id, let text, let sources, _, let streaming) where streaming:
+                return text.isEmpty ? nil : .assistant(id: id, text: text, sources: sources, activity: nil, isStreaming: false)
+            default: return message
+            }
+        }
+    }
+
     func newChat() {
         turnTask?.cancel()
         turnTask = nil

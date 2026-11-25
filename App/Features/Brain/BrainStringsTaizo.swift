@@ -9,6 +9,8 @@ nonisolated extension BrainStrings {
 
     static func taizoMixSongs(_ count: Int) -> String { count == 1 ? String(localized: "1 song") : String(localized: "\(count) songs") }
     static var taizoMixPlay: String { String(localized: "Play") }
+    /// The mix card's eyebrow (redesign 2, Android `brain_taizo_mix_new_label`).
+    static var taizoMixNewLabel: String { String(localized: "New playlist") }
     static var taizoMixSave: String { String(localized: "Save") }
     static var taizoMixSaved: String { String(localized: "Saved") }
     static var taizoMixUpdating: String { String(localized: "Updating") }

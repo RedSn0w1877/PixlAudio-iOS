@@ -104,6 +104,9 @@ targets:
         # only when the listener first uses that part of Song Tap. No entitlements: neither needs one.
         NSCameraUsageDescription: PixlAudio uses the camera to read a Song Tap code from another phone.
         NSBluetoothAlwaysUsageDescription: PixlAudio uses Bluetooth to find a phone nearby for Song Tap.
+        # Ask Taizo's mic (redesign 2, as Android's recognizer): asked for on the first tap of the mic only.
+        NSMicrophoneUsageDescription: PixlAudio listens when you tap the mic to ask Taizo something.
+        NSSpeechRecognitionUsageDescription: PixlAudio turns what you say to Taizo into text.
         # Only NSAllowsArbitraryLoads: iOS ignores it when NSAllowsLocalNetworking is also present
         # (developer.apple.com/documentation/bundleresources/information-property-list/nsapptransportsecurity).
         # User-typed AI endpoints (LAN Ollama etc.) may be plain HTTP; built-in endpoints are HTTPS.

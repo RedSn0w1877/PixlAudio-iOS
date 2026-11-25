@@ -266,53 +266,58 @@ struct TaisChatMessageRow: View {
 
     @Environment(\.appTheme) private var theme
 
-    /// Taizo's bubbles: a 6 pt top-leading corner (pointing at the orb), 22 elsewhere; the user's: a 6 pt
-    /// bottom-trailing corner.
-    static let taizoShape = UnevenRoundedRectangle(topLeadingRadius: 6, bottomLeadingRadius: 22,
-                                                   bottomTrailingRadius: 22, topTrailingRadius: 22, style: .continuous)
-    static let userShape = UnevenRoundedRectangle(topLeadingRadius: 22, bottomLeadingRadius: 22,
-                                                  bottomTrailingRadius: 6, topTrailingRadius: 22, style: .continuous)
+    /// Redesign 2 (Android `AskTaizoSheet`, mockup AndroidAskTaizo): an error answer keeps a bubble (4 pt top-leading,
+    /// 20 elsewhere); the user's bubble has a 6 pt bottom-trailing corner, 24 elsewhere.
+    static let taizoShape = UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 20,
+                                                   bottomTrailingRadius: 20, topTrailingRadius: 20, style: .continuous)
+    static let userShape = UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 24,
+                                                  bottomTrailingRadius: 6, topTrailingRadius: 24, style: .continuous)
 
     var body: some View {
         switch message {
         case .user(_, let text):
+            // `primaryContainer` glass, 16 / 12 pt padding, 16/22, at most 290 pt wide, end-aligned.
             HStack {
-                Spacer(minLength: 48)
+                Spacer(minLength: 0)
                 Text(text)
-                    .pixlFont(.bodyLarge)
-                    .foregroundStyle(theme.onPrimary)
+                    .pixlFont(.custom(size: 16, lineHeight: 22))
+                    .foregroundStyle(theme.onPrimaryContainer)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .pixlGlass(in: Self.userShape, tint: theme.primary.opacity(GlassTint.prominent))
+                    .padding(.vertical, 12)
+                    .pixlGlass(in: Self.userShape, tint: theme.primaryContainer.opacity(GlassTint.prominent))
+                    .frame(maxWidth: 290, alignment: .trailing)
             }
         case .thinking:
             taizoTurn {
                 ThinkingDots(color: theme.primary)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 15)
-                    .pixlGlass(in: Self.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+                    .padding(.vertical, 4)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Taizo is thinking")
         case .textReply(_, let text, let isError):
             taizoTurn {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if isError {
+                if isError {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(theme.onErrorContainer)
                             .accessibilityHidden(true)
+                        Text(text)
+                            .pixlFont(.custom(size: 16, lineHeight: 24))
+                            .foregroundStyle(theme.onErrorContainer)
+                            .textSelection(.enabled)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .pixlGlass(in: Self.taizoShape, tint: theme.errorContainer.opacity(GlassTint.container))
+                } else {
+                    // The answer as plain 16/24 text, no bubble.
                     Text(text)
-                        .pixlFont(.bodyLarge)
-                        .foregroundStyle(isError ? theme.onErrorContainer : theme.onSurface)
+                        .pixlFont(.custom(size: 16, lineHeight: 24))
+                        .foregroundStyle(theme.onSurface)
                         .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 11)
-                .pixlGlass(in: Self.taizoShape,
-                           tint: isError ? theme.errorContainer.opacity(GlassTint.container)
-                                         : theme.surfaceContainerHigh.opacity(GlassTint.surface))
             }
         case .djReply(_, let prompt, let result, let intro):
             taizoTurn {
@@ -347,14 +352,21 @@ struct TaisChatMessageRow: View {
         }
     }
 
-    /// Taizo's side: a small still orb, then the content, leaving room on the trailing side.
+    /// Taizo's side (redesign 2): a 28 pt Sunny avatar and "Taizo" 14/20 medium `onSurfaceVariant` (8 pt apart), 8 pt,
+    /// then the content full width.
     private func taizoTurn<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            TaizoOrb(sparkleSize: 0.44)
-                .frame(width: 28, height: 28)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                TaizoShapeAvatar(size: 28)
+                Text(verbatim: "Taizo")
+                    .pixlFont(.redesignLabel)
+                    .foregroundStyle(theme.onSurfaceVariant)
+            }
+            .accessibilityHidden(true)
             content()
-            Spacer(minLength: 12)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
     }
 }
 
@@ -379,7 +391,7 @@ struct TaizoAnswerBubble: View {
                     .accessibilityLabel("Taizo is thinking")
             } else if !text.isEmpty {
                 Text(text)
-                    .pixlFont(.bodyLarge)
+                    .pixlFont(.custom(size: 16, lineHeight: 24))
                     .foregroundStyle(theme.onSurface)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -405,9 +417,7 @@ struct TaizoAnswerBubble: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .pixlGlass(in: TaisChatMessageRow.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        // Redesign 2: the answer is plain text on the sheet (no bubble).
         .animation(PixlMotion.state, value: activity)
     }
 }
@@ -892,8 +902,13 @@ nonisolated struct AIFlowLayout: Layout {
 
 // MARK: - Cards under an answer (docs/brain-spec.md, 9.3 "What the listener gets", stage 4 milestone 2)
 
-/// A mix `build_mix` made: its title and size, the first four songs, Play and Save, and the chips under them. Every control works on the
-/// phone with no model call (Android `MixCardBubble`). The words are `BrainStrings`'.
+/// A mix `build_mix` made (redesign 2, Android `MixCardBubble`, mockup AndroidAskTaizo "Playlist from Taizo"):
+/// `surfaceContainer` glass, 28 pt corners, 16 pt padding, 16 pt between blocks. Head: an 80 pt `tertiaryContainer`
+/// tile (20 pt corners) with a 96 pt Flower (`tertiary` 55 %) at 30 / −26 pt and a 44 pt Cookie9
+/// (`onTertiaryContainer`) at 8 / −6 pt, 14 pt, "NEW PLAYLIST" 12/16 medium `primary` (0.5), the title 20/26 bold and
+/// the count 14/20. Preview rows 8 pt apart: a 40 pt shape badge (music note), 12 pt, title 14/20 medium over artist
+/// 13/18. Actions 48 pt, 2 pt apart: Play (1.3 share, `primary`, 24 / 8 corners) | Save (`secondaryContainer`, 8 / 24).
+/// Then the outlined refine chips. Every control works on the phone with no model call. The words are `BrainStrings`'.
 struct TaizoMixCard: View {
     let card: MixCard
     let state: MixCardState
@@ -903,109 +918,141 @@ struct TaizoMixCard: View {
 
     @Environment(\.appTheme) private var theme
 
+    private static let previewShapes: [BadgeShapeKind] = [.clover4, .softBurst, .cookie9]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(card.title)
-                    .pixlFont(.titleMedium, weight: .bold)
-                    .foregroundStyle(theme.onSurface)
-                    .lineLimit(2)
-                Text(state.busy ? BrainStrings.taizoMixUpdating : BrainStrings.taizoMixSongs(card.total))
-                    .pixlFont(.bodySmall, weight: .semibold)
-                    .foregroundStyle(theme.primary)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(card.preview.enumerated()), id: \.offset) { _, track in
-                    HStack(spacing: 6) {
-                        Text(track.title)
-                            .pixlFont(.bodyMedium, weight: .semibold)
-                            .foregroundStyle(theme.onSurface)
-                            .lineLimit(1)
-                        Text(track.artist)
-                            .pixlFont(.bodySmall)
-                            .foregroundStyle(theme.onSurfaceVariant)
-                            .lineLimit(1)
-                    }
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                tile
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(BrainStrings.taizoMixNewLabel.uppercased())
+                        .pixlFont(.custom(size: 12, weight: .medium, lineHeight: 16, tracking: 0.5))
+                        .foregroundStyle(theme.primary)
+                    Text(card.title)
+                        .pixlFont(.custom(size: 20, weight: .bold, lineHeight: 26))
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                    Text(BrainStrings.taizoMixSongs(card.total))
+                        .pixlFont(.custom(size: 14, lineHeight: 20))
+                        .foregroundStyle(theme.onSurfaceVariant)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .accessibilityElement(children: .combine)
-            HStack(spacing: 8) {
-                Button(action: onPlay) {
-                    HStack(spacing: 6) {
-                        Image(systemName: state.playing ? "checkmark" : "play.fill").font(.system(size: 15, weight: .bold))
-                        Text(BrainStrings.taizoMixPlay).pixlFont(.labelLarge, weight: .semibold).lineLimit(1)
-                    }
-                    .foregroundStyle(theme.onPrimary)
-                    .padding(.horizontal, 22)
-                    .frame(minHeight: 44)
-                    .background(theme.primary, in: Capsule())
-                    .contentShape(.capsule)
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-                .accessibilityIdentifier("ai.taizo.mix.play")
-                Button(action: onSave) {
-                    HStack(spacing: 6) {
-                        Image(systemName: state.saved ? "checkmark" : "plus").font(.system(size: 15, weight: .semibold))
-                        Text(state.saved ? BrainStrings.taizoMixSaved : BrainStrings.taizoMixSave)
-                            .pixlFont(.labelLarge, weight: .semibold)
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(theme.onSecondaryContainer)
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
-                    .background(theme.secondaryContainer, in: Capsule())
-                    .contentShape(.capsule)
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.95))
-                .disabled(state.saved)
-                .accessibilityIdentifier("ai.taizo.mix.save")
-            }
-            .disabled(state.busy)
-            .opacity(state.busy ? 0.6 : 1)
-            if !card.chips.isEmpty {
-                GlassEffectContainer(spacing: 4) {
-                    AIFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
-                        ForEach(card.chips) { chip in
-                            Button { onChip(chip) } label: {
-                                Text(chip.label)
-                                    .pixlFont(.labelLarge)
+            if !card.preview.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(card.preview.enumerated()), id: \.offset) { index, track in
+                        let tone = badgeTone(index)
+                        HStack(spacing: 12) {
+                            ShapeBadge(systemImage: "music.note", shape: Self.previewShapes[index % Self.previewShapes.count],
+                                       container: tone.0, content: tone.1, size: 40, iconSize: 18)
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(track.title)
+                                    .pixlFont(.redesignLabel)
                                     .foregroundStyle(theme.onSurface)
                                     .lineLimit(1)
-                                    .padding(.horizontal, 14)
-                                    .frame(minHeight: 36)
-                                    .contentShape(.capsule)
+                                Text(track.artist)
+                                    .pixlFont(.redesignRowSubtitle)
+                                    .foregroundStyle(theme.onSurfaceVariant)
+                                    .lineLimit(1)
                             }
-                            .buttonStyle(.plain)
-                            .pixlGlass(in: Capsule(), tint: theme.primary.opacity(theme.isDark ? 0.16 : 0.1), interactive: true)
-                            .accessibilityLabel(chip.label)
                         }
                     }
                 }
-                .disabled(state.busy)
-                .opacity(state.busy ? 0.6 : 1)
+                .accessibilityElement(children: .combine)
             }
-            if !card.notApplied.isEmpty {
-                Text(BrainStrings.taizoMixNotApplied)
-                    .pixlFont(.bodySmall)
+            WeightedRow(weights: [1.3, 1], spacing: 2) {
+                actionButton(systemImage: state.playing ? "checkmark" : "play.fill", title: BrainStrings.taizoMixPlay,
+                             fill: theme.primary, content: theme.onPrimary, leading: 24, trailing: 8,
+                             enabled: !state.busy, action: onPlay)
+                    .accessibilityIdentifier("ai.taizo.mix.play")
+                actionButton(systemImage: state.saved ? "checkmark" : "plus",
+                             title: state.saved ? BrainStrings.taizoMixSaved : BrainStrings.taizoMixSave,
+                             fill: theme.secondaryContainer, content: theme.onSecondaryContainer, leading: 8, trailing: 24,
+                             enabled: !state.busy && !state.saved, action: onSave)
+                    .accessibilityIdentifier("ai.taizo.mix.save")
+            }
+            .frame(height: 48)
+            if state.busy {
+                Text(BrainStrings.taizoMixUpdating)
+                    .pixlFont(.labelMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
-                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !card.chips.isEmpty {
+                AIFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(card.chips) { chip in
+                        TaizoOutlinedChip(text: chip.label, enabled: !state.busy) { onChip(chip) }
+                    }
+                }
             }
             if card.seedsNotUsed > 0 {
                 Text(BrainStrings.taizoMixSeedNotUsed)
-                    .pixlFont(.bodySmall)
+                    .pixlFont(.labelMedium)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !card.notApplied.isEmpty {
+                Text(BrainStrings.taizoMixNotApplied)
+                    .pixlFont(.labelMedium)
                     .foregroundStyle(theme.onSurfaceVariant)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if state.failed {
                 Text(BrainStrings.taizoMixFailed)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(theme.onErrorContainer)
+                    .pixlFont(.labelMedium)
+                    .foregroundStyle(theme.error)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(14)
-        .pixlGlass(in: TaisChatMessageRow.taizoShape, tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+        .padding(16)
+        .pixlGlass(in: RoundedRectangle(cornerRadius: 28, style: .continuous),
+                   tint: theme.surfaceContainer.opacity(GlassTint.surface))
         .accessibilityIdentifier("ai.taizo.mix")
+    }
+
+    /// The 80 pt head tile with its two expressive shapes (fills on the card's glass).
+    private var tile: some View {
+        theme.tertiaryContainer
+            .frame(width: 80, height: 80)
+            .overlay(alignment: .topTrailing) {
+                ExpressiveBadgeShape(.flower).fill(theme.tertiary.opacity(0.55))
+                    .frame(width: 96, height: 96)
+                    .offset(x: 30, y: -26)
+            }
+            .overlay(alignment: .bottomLeading) {
+                ExpressiveBadgeShape(.cookie9).fill(theme.onTertiaryContainer)
+                    .frame(width: 44, height: 44)
+                    .offset(x: 8, y: -6)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    /// The tonal pairs the badges cycle through (primary, tertiary, secondary, neutral; Android `badgeTones`).
+    private func badgeTone(_ index: Int) -> (Color, Color) {
+        switch index % 4 {
+        case 0: (theme.primaryContainer, theme.onPrimaryContainer)
+        case 1: (theme.tertiaryContainer, theme.onTertiaryContainer)
+        case 2: (theme.secondaryContainer, theme.onSecondaryContainer)
+        default: (theme.surfaceContainerHighest, theme.onSurfaceVariant)
+        }
+    }
+
+    private func actionButton(systemImage: String, title: String, fill: Color, content: Color, leading: CGFloat,
+                              trailing: CGFloat, enabled: Bool, action: @escaping () -> Void) -> some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: leading, bottomLeadingRadius: leading,
+                                           bottomTrailingRadius: trailing, topTrailingRadius: trailing, style: .continuous)
+        return Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage).font(.system(size: 17, weight: .semibold))
+                Text(title).pixlFont(.custom(size: 15, weight: .medium, lineHeight: 20)).lineLimit(1)
+            }
+            .foregroundStyle(content)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(shape.fill(enabled ? fill : fill.opacity(0.38)))
+            .contentShape(shape)
+        }
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
+        .disabled(!enabled)
     }
 }
 
@@ -1062,5 +1109,72 @@ struct TaizoLessRow: View {
         .pixlGlass(in: Capsule(), tint: theme.primary.opacity(theme.isDark ? 0.16 : 0.1), interactive: true)
         .accessibilityLabel(text)
         .accessibilityIdentifier("ai.taizo.less")
+    }
+}
+
+/// Taizo's mark (redesign 2, Android `TaizoShapeAvatar`): the sparkle on an expressive Sunny shape in
+/// `secondaryContainer` (52 pt in the header, 72 pt on the empty page, 28 pt by answers).
+struct TaizoShapeAvatar: View {
+    let size: CGFloat
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        ShapeBadge(systemImage: "sparkles", shape: .sunny, container: theme.secondaryContainer,
+                   content: theme.onSecondaryContainer, size: size, iconSize: size * 0.46)
+    }
+}
+
+/// The refine / suggestion chip (redesign 2, Android `TaizoOutlinedChip`): 44 pt min, 12 pt corners, a 1 pt `outline`
+/// border, 14 pt side padding, 14/20 medium `onSurface`. Clear glass under the outline (a chip, interactive).
+struct TaizoOutlinedChip: View {
+    let text: String
+    var enabled = true
+    let action: () -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        Button(action: action) {
+            Text(text)
+                .pixlFont(.redesignLabel)
+                .foregroundStyle(enabled ? theme.onSurface : theme.onSurface.opacity(0.38))
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .overlay { shape.strokeBorder(theme.outline, lineWidth: 1).allowsHitTesting(false) }
+        .pixlGlass(in: shape, interactive: enabled)
+        .accessibilityLabel(text)
+    }
+}
+
+/// Compose `Row` children with `Modifier.weight`: the width (less the gaps) shared by `weights`, each child as tall as
+/// the row.
+nonisolated struct WeightedRow: Layout {
+    var weights: [CGFloat]
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let height = proposal.height ?? subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+        return CGSize(width: proposal.width ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let total = weights.prefix(subviews.count).reduce(0, +)
+        guard total > 0 else { return }
+        let free = max(bounds.width - spacing * CGFloat(max(subviews.count - 1, 0)), 0)
+        var x = bounds.minX
+        for (index, subview) in subviews.enumerated() {
+            let weight = index < weights.count ? weights[index] : 0
+            let width = free * weight / total
+            subview.place(at: CGPoint(x: x, y: bounds.minY), anchor: .topLeading,
+                          proposal: ProposedViewSize(width: width, height: bounds.height))
+            x += width + spacing
+        }
     }
 }
