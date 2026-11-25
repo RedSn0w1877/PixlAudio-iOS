@@ -116,6 +116,14 @@ public enum VoiceRole {
     public static let all: [String] = [lead, background, duet]
 }
 
+/// Well-known `Voice` ids beyond the plain `lead` / `duet` / `background` ones (Android `LyricsVoiceIds`). In duet
+/// songs the TTML parser files each background vocal (role `background`) under the voice of the line it was nested
+/// in, so the karaoke view keeps it on that singer's side. Any other background id means "owner unknown".
+public enum LyricsVoiceIds {
+    public static let leadBackground = "lead-background"
+    public static let duetBackground = "duet-background"
+}
+
 /// A singer/voice referenced by lines.
 public struct Voice: Sendable, Hashable, Codable {
     public var id: String

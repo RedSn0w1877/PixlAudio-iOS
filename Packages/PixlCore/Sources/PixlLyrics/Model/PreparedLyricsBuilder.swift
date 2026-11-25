@@ -80,12 +80,18 @@ public enum PreparedLyricsBuilder {
         let source: SyncedLine?
         /// Only for the LRC path: end set by a following empty LRC line.
         var markerEndMs: Int64?
+        /// Background vocals only: the voice of the line the source nested this vocal in (`LyricsVoiceIds`).
+        /// Grouping prefers a line of that voice, so in a duet a vocal never jumps to the other singer's overlapping
+        /// line.
+        let ownerHint: PreparedVoiceRole?
         var estimatedEndMs: Int64 = 0
         var groupLead = -1
         var bgAbove = false
 
         init(startMs: Int64, endMs: Int64, endIsExplicit: Bool, text: String, role: PreparedVoiceRole,
-             syllables: [DraftSyllable]?, translation: String?, romanization: String?, source: SyncedLine? = nil) {
+             syllables: [DraftSyllable]?, translation: String?, romanization: String?, source: SyncedLine? = nil,
+             ownerHint: PreparedVoiceRole? = nil) {
+            self.ownerHint = ownerHint
             self.startMs = startMs
             self.endMs = endMs
             self.endIsExplicit = endIsExplicit
@@ -113,6 +119,11 @@ public enum PreparedLyricsBuilder {
         for line in PreparedText.stableSorted(doc.lines, by: \.startMs) {
             if line.text.isKotlinBlank { continue }
             let role = PreparedVoiceRole.fromRole(doc.voices.first { $0.id.isIdentical(to: line.voiceId) }?.role)
+            var ownerHint: PreparedVoiceRole?
+            if role == .background {
+                if line.voiceId.isIdentical(to: LyricsVoiceIds.duetBackground) { ownerHint = .duet }
+                if line.voiceId.isIdentical(to: LyricsVoiceIds.leadBackground) { ownerHint = .lead }
+            }
             let lineUnits = PreparedText.units(line.text)
             let first = PreparedText.firstNonWhitespace(lineUnits)
             let last = PreparedText.lastNonWhitespace(lineUnits)
@@ -163,7 +174,8 @@ public enum PreparedLyricsBuilder {
                 role: role,
                 syllables: syllables,
                 translation: extras?.translation.flatMap { $0.isKotlinBlank ? nil : $0 },
-                romanization: extras?.romanization.flatMap { $0.isKotlinBlank ? nil : $0 }
+                romanization: extras?.romanization.flatMap { $0.isKotlinBlank ? nil : $0 },
+                ownerHint: ownerHint
             ))
         }
         if drafts.isEmpty { return nil }
@@ -305,6 +317,14 @@ public enum PreparedLyricsBuilder {
             if lead != i { members[lead, default: []].append(i) }
         }
 
+        // Duet side: a duet line sits on the end side, and a grouped background vocal follows the line it belongs
+        // to. An orphan vocal goes by the voice the source nested it in.
+        let hasDuet = drafts.contains { $0.role == .duet }
+        let duetEnd = drafts.indices.map { i -> Bool in
+            let d = drafts[i]
+            return hasDuet && (drafts[d.groupLead].role == .duet || (d.groupLead == i && d.ownerHint == .duet))
+        }
+
         var rows: [PreparedRow] = []
         rows.reserveCapacity(drafts.count + 4)
         var interludes: [(Int64, Int64)] = []
@@ -314,7 +334,7 @@ public enum PreparedLyricsBuilder {
             let groupStart = group.reduce(drafts[leader].startMs) { Swift.min($0, drafts[$1].startMs) }
             // prevEnd is 0 before the first group, so this also catches an intro of >= 9 s.
             if groupStart &- prevEnd >= interludeMinGapMs {
-                rows.append(.interlude(startMs: prevEnd, endMs: groupStart, alignEnd: drafts[leader].role == .duet))
+                rows.append(.interlude(startMs: prevEnd, endMs: groupStart, alignEnd: duetEnd[leader]))
                 interludes.append((prevEnd, groupStart))
             }
             for i in group where drafts[i].bgAbove { rows.append(.line(lineIndex: i)) }
@@ -364,7 +384,8 @@ public enum PreparedLyricsBuilder {
                     )
                 },
                 translation: d.translation,
-                romanization: d.romanization
+                romanization: d.romanization,
+                duetEnd: duetEnd[i]
             )
         }
 
@@ -372,7 +393,7 @@ public enum PreparedLyricsBuilder {
             lines: lines,
             rows: rows,
             hasWordTiming: lines.contains { $0.hasWordTiming },
-            hasDuet: lines.contains { $0.role == .duet },
+            hasDuet: hasDuet,
             startsSorted: lines.map(\.startMs)
         )
     }
@@ -424,30 +445,41 @@ public enum PreparedLyricsBuilder {
     }
 
     /// §1.7: a background vocal belongs to the lead line whose `[start - 1000, end]` window holds its start. A lead
-    /// already playing when the vocal starts wins over one about to start.
+    /// already playing when the vocal starts wins over one about to start. When the source said which voice the
+    /// vocal was nested in (`DraftLine.ownerHint`), a line of that voice wins over the other singer's line; with none
+    /// in the window, any line will do.
     static func groupBackgroundVocals(_ drafts: [DraftLine]) {
         for (i, d) in drafts.enumerated() {
             d.groupLead = i
             d.bgAbove = false
         }
         for d in drafts where d.role == .background {
-            var playing = -1
-            var upcoming = -1
-            for (j, lead) in drafts.enumerated() where lead.role != .background {
-                let inWindow = d.startMs >= lead.startMs &- backgroundGroupLeadInMs && d.startMs <= lead.endMs
-                if !inWindow { continue }
-                if lead.startMs <= d.startMs {
-                    if playing < 0 || lead.startMs >= drafts[playing].startMs { playing = j }
-                } else if upcoming < 0 {
-                    upcoming = j
-                }
+            var lead = -1
+            if let hint = d.ownerHint {
+                lead = findGroupLead(drafts, d) { ($0.role == .duet) == (hint == .duet) }
             }
-            let lead = playing >= 0 ? playing : upcoming
+            if lead < 0 { lead = findGroupLead(drafts, d) { _ in true } }
             if lead >= 0 {
                 d.groupLead = lead
                 d.bgAbove = d.startMs < drafts[lead].startMs
             }
         }
+    }
+
+    private static func findGroupLead(_ drafts: [DraftLine], _ d: DraftLine,
+                                      accept: (DraftLine) -> Bool) -> Int {
+        var playing = -1
+        var upcoming = -1
+        for (j, lead) in drafts.enumerated() where lead.role != .background && accept(lead) {
+            let inWindow = d.startMs >= lead.startMs &- backgroundGroupLeadInMs && d.startMs <= lead.endMs
+            if !inWindow { continue }
+            if lead.startMs <= d.startMs {
+                if playing < 0 || lead.startMs >= drafts[playing].startMs { playing = j }
+            } else if upcoming < 0 {
+                upcoming = j
+            }
+        }
+        return playing >= 0 ? playing : upcoming
     }
 
     /// Estimated end used for interlude detection: the explicit end when there is one, otherwise

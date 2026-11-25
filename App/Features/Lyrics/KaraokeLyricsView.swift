@@ -49,7 +49,8 @@ struct KaraokeRowStyle: Equatable {
 
 /// One visual row of the karaoke list.
 enum KaraokeRowItem {
-    case line(PreparedLine, text: Text, table: KaraokePieceTable?)
+    /// `side`: the role that places the line (`PreparedLyrics.sideRole(of:)`): a background vocal follows its duet line.
+    case line(PreparedLine, text: Text, table: KaraokePieceTable?, side: PreparedVoiceRole)
     case interlude(g0: Int64, g1: Int64, alignEnd: Bool)
 }
 
@@ -66,7 +67,10 @@ struct KaraokeModel {
             switch row {
             case .line(let index):
                 let line = prepared.lines[index]
-                guard line.hasWordTiming else { return .line(line, text: Text(verbatim: line.text), table: nil) }
+                let side = prepared.sideRole(of: line)
+                guard line.hasWordTiming else {
+                    return .line(line, text: Text(verbatim: line.text), table: nil, side: side)
+                }
                 let table = KaraokePieceTable(line: line)
                 var text = Text(verbatim: "")
                 for segment in table.segments {
@@ -75,7 +79,7 @@ struct KaraokeModel {
                         : Text(verbatim: segment.text)
                     text = Text("\(text)\(piece)")
                 }
-                return .line(line, text: text, table: table)
+                return .line(line, text: text, table: table, side: side)
             case .interlude(let startMs, let endMs, let alignEnd):
                 return .interlude(g0: startMs, g1: endMs, alignEnd: alignEnd)
             }
@@ -181,7 +185,7 @@ struct KaraokeLyricsView: View {
     // MARK: Interaction
 
     private func activate(row r: Int) {
-        guard let model, case .line(let line, _, _) = model.items[r] else { return }
+        guard let model, case .line(let line, _, _, _) = model.items[r] else { return }
         driver.lineTapped(line.index)
         onSeekLine(line)
     }
@@ -316,12 +320,16 @@ private struct KaraokeRowContainer: View {
             .blur(radius: row.blur)
             .opacity(row.culled ? 0 : Double(row.alpha))
             .offset(y: min(row.y, 100_000))
+            // Duet sides are physical (singer one left, singer two right, as on Android): a right-to-left device
+            // language must not mirror the paddings, alignments and pivots of a duet row.
+            .transformEnvironment(\.layoutDirection) { if style.metrics.hasDuet { $0 = .leftToRight } }
     }
 
     @ViewBuilder private var content: some View {
         switch item {
-        case .line(let line, let text, let table):
-            KaraokeLineRow(line: line, text: text, table: table, row: row, clock: clock, style: style, pressed: pressed)
+        case .line(let line, let text, let table, let side):
+            KaraokeLineRow(line: line, text: text, table: table, side: side, row: row, clock: clock, style: style,
+                           pressed: pressed)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: line.text))
                 .accessibilityAddTraits(.isButton)
@@ -335,7 +343,7 @@ private struct KaraokeRowContainer: View {
 
     private var pivotX: CGFloat {
         switch item {
-        case .line(let line, _, _): CGFloat(style.metrics.pivotX(line))
+        case .line(let line, _, _, let side): CGFloat(style.metrics.pivotX(line, side: side))
         case .interlude(_, _, let alignEnd): CGFloat(LyricsRenderMetrics.interludePivotX(alignEnd: alignEnd))
         }
     }
@@ -346,6 +354,8 @@ private struct KaraokeLineRow: View {
     let line: PreparedLine
     let text: Text
     let table: KaraokePieceTable?
+    /// The role that places the line (a background vocal follows its duet line); `line.role` sizes it.
+    let side: PreparedVoiceRole
     let row: LyricRowState
     let clock: LyricsHotClock
     let style: KaraokeRowStyle
@@ -374,28 +384,29 @@ private struct KaraokeLineRow: View {
             sung: Double(alphas.sung), unsung: Double(alphas.unsung), em: em,
             fade: CGFloat(EmphasisMath.fadeWidthPx(lineHeightPx: fontSize * LyricsRenderMetrics.lineHeightEm)),
             background: isBackground, reducedMotion: metrics.reducedMotion, highContrast: metrics.highContrast,
-            startAligned: metrics.textAlign(role: role) == .start && !LyricsRenderMetrics.isRtlText(line.text))
+            startAligned: metrics.textAlign(role: side) == .start
+                && (metrics.hasDuet || !LyricsRenderMetrics.isRtlText(line.text)))
 
-        VStack(alignment: style.stackAlignment(role: role), spacing: CGFloat(metrics.extraGapPx)) {
+        VStack(alignment: style.stackAlignment(role: side), spacing: CGFloat(metrics.extraGapPx)) {
             text
                 .font(style.font(role: role))
                 .tracking(em * CGFloat(LyricsRenderMetrics.letterSpacingEm))
                 .lineSpacing(style.lineSpacing(fontSize: fontSize))
-                .multilineTextAlignment(style.textAlignment(role: role))
+                .multilineTextAlignment(style.textAlignment(role: side))
                 .foregroundStyle(.white)
                 .textRenderer(renderer)
                 .fixedSize(horizontal: false, vertical: true)
             if let roman {
                 Text(verbatim: roman)
                     .font(style.secondaryFont(size: metrics.romanizationEmPx))
-                    .multilineTextAlignment(style.textAlignment(role: role))
+                    .multilineTextAlignment(style.textAlignment(role: side))
                     .foregroundStyle(.white.opacity(Double(alphas.unsung)))
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let translation {
                 Text(verbatim: translation)
                     .font(style.secondaryFont(size: metrics.translationEmPx))
-                    .multilineTextAlignment(style.textAlignment(role: role))
+                    .multilineTextAlignment(style.textAlignment(role: side))
                     .foregroundStyle(.white.opacity(Double(alphas.translation)))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -408,8 +419,8 @@ private struct KaraokeLineRow: View {
                     .padding(.vertical, -style.em * CGFloat(LyricsRenderMetrics.pressInsetVEm))
             }
         }
-        .frame(width: CGFloat(metrics.contentWidth(role: role, width: width)), alignment: style.frameAlignment(role: role))
-        .padding(.leading, CGFloat(metrics.startPadding(role: role, width: width)))
+        .frame(width: CGFloat(metrics.contentWidth(role: side, width: width)), alignment: style.frameAlignment(role: side))
+        .padding(.leading, CGFloat(metrics.startPadding(role: side, width: width)))
         .padding(.vertical, padV)
         .frame(width: style.width, alignment: .leading)
     }
