@@ -39,3 +39,35 @@ left or right".
 - "Changes fonts" could not be reproduced from code; if it still shows, it is most likely the system font fallback
   for scripts SF Pro lacks (e.g. Hangul in a mixed line), or the emphasis scale on long held words (explicit-end
   TTML, which is also where duet roles come from).
+
+## Round 2: Android parity (Android `lyrics-duet` bdd22f6 / a43f146, its handoff items 1-6)
+
+- **Background vocals keep their singer's side from the TTML (Android 2 + 3).** In a duet song
+  `TtmlDocumentParser` files each background vocal under `LyricsVoiceIds.leadBackground` /
+  `.duetBackground` (PixlModel, role `background`) by the `<p>` it was nested in. `PreparedLyricsBuilder` reads
+  that as an owner hint: grouping prefers a line of that side and falls back to the old time-only rule.
+  `PreparedLine.duetEnd` (new, default false) is true for duet lines, background vocals grouped under one, and
+  orphan vocals nested in one; `PreparedLyrics.sideRole(of:)` and the interlude `alignEnd` now key on it. Solo songs
+  keep plain `background` ids; cached docs without the new ids behave exactly as before.
+- **Undeclared agents (Android 4).** iOS already resolved undeclared agents in order of appearance (first singer
+  lead, others duet); now an undeclared `v1000`+ id (the catalogs' group id) sings with the lead
+  (`Builder.isGroupAgentId`). iOS still picks the lead as the first singer to *appear*, not the first declared
+  person (Android); same result on catalog files, which declare v1 first.
+- **Physical duet sides (Android 5).** `LyricsRenderMetrics.pivotX` in duets is 0 / 1 by side only (an RTL
+  singer-1 line used to pivot right). `KaraokeRowContainer` forces `.leftToRight` layout direction on duet rows so a
+  right-to-left device language cannot mirror the paddings / alignments; RTL lines in duets get the start display
+  padding like LTR ones. Solo songs unchanged (still `.leading` / `.trailing`).
+- **Short lines flush to their side (Android 1): no bug on iOS.** The row's VStack hugs its text and is placed by
+  `.frame(width: contentWidth, alignment: side)`, so a one-row line sits at the trailing edge; translation and
+  romanisation follow the stack alignment. Nothing like Compose's shrink-to-intrinsic measurement.
+- **Font coverage (Android 6): not applicable.** iOS has no whole-song font fallback; every line uses
+  `.system(size:weight:)` (SF Pro, per-glyph system fallback only).
+- Tests: `DuetLyricsTests` (Android `DuetLyricsTest` end to end, plus an orphan-in-duet case) and
+  `LyricsRenderMathTests.goldenAlignmentTable` (Android's table).
+
+### Still open
+
+- Solo songs with RTL text: Android places them by `TextAlign.Start/End` (RTL start = right, end pivot = left);
+  iOS keeps `.leading` frames (left in an LTR app) with a right pivot for start. Not touched (out of scope).
+- Wrapped RTL lines in a duet under the forced LTR direction: lines should align left (singer 1) / right
+  (singer 2); not checked on a device.
