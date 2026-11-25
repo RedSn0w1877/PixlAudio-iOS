@@ -92,8 +92,8 @@ struct AutoplayLine: View {
                 .accessibilityIdentifier("queue.refreshPicks")
             }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 16)
+        .padding(.leading, 4) // inside the queue list's 16 pt gutter (redesign 2)
+        .padding(.trailing, 0)
         .padding(.top, 10)
         .padding(.bottom, 6)
     }

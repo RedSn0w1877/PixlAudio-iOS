@@ -3,23 +3,22 @@ import PixlModel
 import SwiftUI
 import UIKit
 
-/// The queue (Android `QueueBottomSheet`), presented over the player with the system sheet:
-/// - header: "Next up" (`headlineLarge` semibold; tap = locate the current song) over "N tracks lined up.", and the
-///   queue-source capsule;
-/// - the songs (from the current one on, or the whole queue with `show_queue_history`), 8 pt apart: glass rows with
-///   22 pt corners — the current one a capsule with circular art, bold `primary` title and the playing indicator.
-///   Songs after the current one have a drag handle (reorder) and swipe left to remove (60 pt of tension, then free;
-///   past 40 % of the width it goes), with an undo bar;
-/// - the bottom toolbar: shuffle / repeat / sleep timer circles and the ⋯ circle, which opens Locate current song ·
-///   Clear queue · Save as playlist over a scrim.
+/// The queue (Android `QueueBottomSheet`, redesign 2 2026-11-25, mockup AndroidQueue), presented over the player with
+/// the system sheet:
+/// - header: "Queue" 28/34 bold (tap = locate the current song) over "Drag to reorder, swipe to remove", the Save as
+///   playlist | Clear connected group, then "Up next" with the count of songs to come;
+/// - the songs (from the current one on, or the whole queue with `show_queue_history`), 2 pt apart in the 16 pt gutter:
+///   the current one is the now playing card (`tertiaryContainer`), the played songs one grouped block above it and the
+///   upcoming ones another below (20 / 4 pt corners). Upcoming songs have a drag handle (reorder) and swipe left to
+///   remove (60 pt of tension, then free; past 40 % of the width it goes), with an undo bar;
+/// - the bottom toolbar as the nav's split pills: a big pill with shuffle / repeat / sleep timer and the round ⋯ pill,
+///   which opens Locate current song · Clear queue · Save as playlist over a scrim.
 /// Every row's ⋮ opens the song sheet; the timer opens `SleepTimerSheet`; Save as playlist opens
 /// `SaveQueueAsPlaylistSheet`.
 ///
-/// Liquid (Hoa, 2026-10-07, "more Liquid Glass"; docs/design.md › Glass expansion): the sheet is see-through glass at
-/// 92 % (`PresentationDetent.tallGlass`); the toolbar's circles are each their own interactive glass (Android puts
-/// glass circles on a glass capsule, which iOS can't stack, so the capsule went, as in `PlayerToggleRow`); and the
-/// toolbar and the open menu share one `GlassEffectContainer`, so the ⋯ circle liquid-morphs into the
-/// "Save as playlist" pill (one `glassEffectID`) while Locate and Clear materialise.
+/// Liquid: the sheet is see-through glass (`PresentationDetent.tallGlass`); the toolbar's big pill is one glass shape
+/// with fills on it (no glass on glass); the toolbar and the open menu share one `GlassEffectContainer`, so the ⋯ pill
+/// liquid-morphs into the "Save as playlist" pill (one `glassEffectID`) while Locate and Clear materialise.
 struct QueueSheet: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(PlaybackStore.self) private var playback
@@ -75,9 +74,9 @@ struct QueueSheet: View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 if displayCount == 0 {
-                    header(count: displayCount)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 24)
+                    header(count: displayCount, upcoming: 0)
+                        .padding(.horizontal, Redesign.gutter)
+                        .padding(.top, 22)
                         .padding(.bottom, 12)
                     Text("Queue is empty.")
                         .pixlFont(.bodyLarge)
@@ -163,39 +162,87 @@ struct QueueSheet: View {
 
     // MARK: Header
 
-    private func header(count: Int) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Next up")
-                    .pixlFont(.headlineLarge, weight: .semibold)
-                    .foregroundStyle(theme.onSurface)
-                    .onTapGesture { locateRequest += 1 }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityHint("Scrolls to the current song")
-                Text(Self.countLabel(count))
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
-                // Endless Listening: the host is one tap away from the queue (only while that station is the queue).
-                if env.brain.autoplay.isEndless {
-                    AskHostButton { showsAskHost = true }
-                        .padding(.top, 4)
+    /// Redesign 2 (Android `QueueHeader`, mockup AndroidQueue): 54 pt min in the 16 pt gutter — "Queue" 28/34 bold
+    /// (−0.2) over "Drag to reorder, swipe to remove" 13/18 (tap the title: locate the current song), the Endless host
+    /// chip under it; on the right a connected group, 44 pt, `surfaceContainerHighest` glass: Save as playlist (48 pt
+    /// wide, 22 / 6 corners) | "Clear" (6 / 22). Then 12 pt and "Up next" (from the station when there is one) 16/22
+    /// medium with "N songs" 13/18 on the right.
+    private func header(count: Int, upcoming: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Queue")
+                        .pixlFont(.custom(size: 28, weight: .bold, lineHeight: 34, tracking: -0.2))
+                        .foregroundStyle(theme.onSurface)
+                        .onTapGesture { locateRequest += 1 }
+                        .accessibilityAddTraits([.isHeader, .isButton])
+                        .accessibilityHint("Scrolls to the current song")
+                    Text(count <= 0 ? Self.countLabel(0) : String(localized: "Drag to reorder, swipe to remove"))
+                        .pixlFont(.redesignRowSubtitle)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                    // Endless Listening: the host is one tap away from the queue (only while that station is the queue).
+                    if env.brain.autoplay.isEndless {
+                        AskHostButton { showsAskHost = true }
+                            .padding(.top, 6)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                GlassEffectContainer(spacing: 1) {
+                    HStack(spacing: Redesign.groupGap) {
+                        RedesignGroupButton(position: .first, isSelected: false, height: 44, horizontalPadding: 0,
+                                            container: theme.surfaceContainerHighest,
+                                            action: { showsSaveAsPlaylist = true }) { _ in
+                            Image(systemName: "text.badge.plus")
+                                .font(.system(size: 17, weight: .medium))
+                                .foregroundStyle(theme.onSurface)
+                        }
+                        .frame(width: 48)
+                        .accessibilityLabel("Save as playlist")
+                        .accessibilityIdentifier("queue.save")
+                        RedesignGroupButton(position: .last, isSelected: false, height: 44, horizontalPadding: 0,
+                                            container: theme.surfaceContainerHighest,
+                                            action: { confirmsClear = true }) { _ in
+                            Text("Clear")
+                                .pixlFont(.redesignLabel)
+                                .foregroundStyle(theme.onSurface)
+                                .padding(.leading, 14)
+                                .padding(.trailing, 16)
+                        }
+                        .fixedSize()
+                        .accessibilityIdentifier("queue.clear")
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 8) {
-                Image(systemName: "music.note.list")
-                    .font(.system(size: 15, weight: .semibold))
-                Text("Queue")
-                    .pixlFont(.labelLarge)
-                    .lineLimit(1)
+            .frame(minHeight: 54)
+            if count > 0 {
+                HStack(spacing: 12) {
+                    Text(upNextTitle)
+                        .pixlFont(.redesignRowTitle)
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(Self.songCount(upcoming))
+                        .pixlFont(.redesignRowSubtitle)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .padding(.top, 12)
             }
-            .foregroundStyle(theme.onSurfaceVariant)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(maxWidth: 190)
-            .pixlGlass(in: Capsule(), tint: theme.surfaceContainerHighest.opacity(0.88 * GlassTint.container))
-            .padding(.top, 6)
         }
+    }
+
+    /// "Up next from <source>" (Android `queue_up_next_from`): iOS knows the source only for a station.
+    private var upNextTitle: String {
+        if let station = env.brain.autoplay.stationTitle, !station.isEmpty {
+            return String(localized: "Up next from \(station)")
+        }
+        return String(localized: "Up next")
+    }
+
+    /// Android `queue_song_count`.
+    static func songCount(_ count: Int) -> String {
+        count == 1 ? String(localized: "1 song") : String(localized: "\(count) songs")
     }
 
     /// Android `queue_tracks_empty` / `queue_tracks_lined_up`.
@@ -238,8 +285,10 @@ struct QueueSheet: View {
                                          notesOff: notesOff).byIndex
         return ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 8) {
-                    Spacer().frame(height: 6)
+                // Redesign 2: grouped rows 2 pt apart in the 16 pt gutter; the played songs are one group above the
+                // now playing card, the upcoming ones another below it.
+                LazyVStack(spacing: Redesign.rowGap) {
+                    Spacer().frame(height: 4)
                     // Display positions as ids, as before (a row's slot is reused when the queue shifts).
                     ForEach(0..<count, id: \.self) { index in
                         if index == autoplayLine { autoplayLineView }
@@ -250,12 +299,23 @@ struct QueueSheet: View {
                         let why = whyLines.isEmpty ? nil : whyLines[song.id]
                         // The note is part of its row: it moves with the row when it is dragged, and the row's own height is what sets the
                         // drag's pitch (measured on the row, below, not on the note).
+                        let shape = isCurrent ? groupedRowShape(index: 0, count: 1)
+                            : (index < currentDisplay ? groupedRowShape(index: index, count: max(currentDisplay, 1))
+                               : groupedRowShape(index: index - (currentDisplay + 1),
+                                                 count: count - (currentDisplay + 1)))
                         VStack(spacing: 8) {
                             if let note {
                                 // Endless Listening: the host's note is a small card; every other queue keeps the quiet line.
-                                if hostActive { HostNoteCard(text: note).padding(.horizontal, 16) } else { SetNoteRowLabel(text: note) }
+                                if hostActive { HostNoteCard(text: note) } else { SetNoteRowLabel(text: note) }
                             }
-                            QueueSongRow(song: song, isCurrent: isCurrent,
+                            if isCurrent {
+                                QueueNowPlayingCard(song: song, isPlaying: playback.isPlaying,
+                                                    onPlayPause: { playback.togglePlayPause() },
+                                                    onTap: { playback.skipToQueueItem(at: index + offset) },
+                                                    onLongPress: { songInfo = QueueSongRef(id: song.id) })
+                                    .padding(.vertical, 6)
+                            } else {
+                            QueueSongRow(song: song, isCurrent: isCurrent, shape: shape,
                                      isPlaying: isCurrent && playback.isPlaying, canReorder: canReorder,
                                      isDragging: reorder.draggingIndex == index,
                                      why: why?.line.map(BrainStrings.whyLine),
@@ -271,7 +331,8 @@ struct QueueSheet: View {
                                      handle: handleGesture(index: index, minIndex: currentDisplay + 1,
                                                            maxIndex: count - 1, offset: offset))
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                                if index == 0 { rowPitch = height + 8 }
+                                if index == currentDisplay + 1 { rowPitch = height + Redesign.rowGap }
+                            }
                             }
                         }
                         .modifier(QueueRowReorderOffset(reorder: reorder, index: index, pitch: rowPitch))
@@ -281,16 +342,17 @@ struct QueueSheet: View {
                     // No pick of Autoplay's is waiting: the line closes the queue, so its switch is always in reach.
                     if autoplayLine == nil { autoplayLineView }
                 }
+                .padding(.horizontal, Redesign.gutter)
                 .padding(.bottom, 120)
             }
             .scrollDisabled(reorder.draggingIndex != nil)
             // The header is the list's top inset, so rows scroll up under it (the cut-off sits at the top of the sheet,
             // not right below the title) and the system blurs the edge softly; the same soft edge at the bottom.
             .safeAreaInset(edge: .top, spacing: 0) {
-                header(count: count)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 24)
-                    .padding(.bottom, 12)
+                header(count: count, upcoming: max(count - currentDisplay - 1, 0))
+                    .padding(.horizontal, Redesign.gutter)
+                    .padding(.top, 22)
+                    .padding(.bottom, 8)
             }
             .scrollEdgeEffectStyle(.soft, for: .top)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
@@ -337,13 +399,14 @@ struct QueueSheet: View {
 
     // MARK: Toolbar
 
-    /// Shuffle · repeat · sleep timer as separate glass circles, then the ⋯ circle (Android `QueueControlsToolbar`).
-    /// The gaps are 12 pt between the circles and 16 pt to the ⋯ circle, above the container's 8 pt: they render
-    /// together but never blend at rest.
+    /// Redesign 2 (Android: the nav's split pills, mockup AndroidQueue): 12 pt from the sides, 68 pt tall, 10 pt
+    /// apart. The big pill is `surfaceContainerHigh` glass, 34 pt corners, 8 pt in, with shuffle / repeat / timer as
+    /// equal 52 pt buttons (26 pt corners, 4 pt apart; on = a `tertiaryContainer` fill on the pill's glass); the round
+    /// 68 pt ⋯ pill is `tertiaryContainer` glass and keeps the menu (it morphs into "Save as playlist").
     private var toolbar: some View {
         let timerActive = env.sleepTimer.state.display != nil || env.sleepTimer.state.countedPlay != nil
-        return HStack(spacing: 4) {
-            HStack(spacing: 12) {
+        return HStack(spacing: 10) {
+            HStack(spacing: 4) {
                 toolbarButton("shuffle", label: "Toggle shuffle", active: playback.isShuffleEnabled) {
                     playback.setShuffleEnabled(!playback.isShuffleEnabled)
                 }
@@ -356,15 +419,16 @@ struct QueueSheet: View {
                 }
                 .accessibilityIdentifier("queue.timer")
             }
-            // Android's capsule padding, kept so nothing moves now that the capsule's glass is gone.
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(maxHeight: .infinity)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .pixlGlass(in: RoundedRectangle(cornerRadius: 34, style: .continuous),
+                       tint: theme.surfaceContainerHigh.opacity(GlassTint.surface))
+            .glassEffectTransition(.materialize)
             Button(action: toggleMenu) {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(theme.onTertiaryContainer)
-                    .frame(width: 70, height: 70)
+                    .frame(width: 68, height: 68)
                     .contentShape(.circle)
             }
             .buttonStyle(.plain)
@@ -374,29 +438,27 @@ struct QueueSheet: View {
             .accessibilityLabel("More actions")
             .accessibilityIdentifier("queue.more")
         }
-        .frame(height: 70)
+        .frame(height: 68)
+        .padding(.horizontal, 12)
     }
 
-    /// One toolbar circle: its own interactive glass (`primary` when on, a hint of `surfaceContainer` when off), the
-    /// `PlayerToggleRow` recipe with `.regular` glass (the queue isn't over media). It materialises in and out when
-    /// the menu opens instead of being pulled into the Save pill.
+    /// One toolbar button: a 52 pt fill on the big pill's glass (no glass on glass), 26 pt corners, `tertiaryContainer`
+    /// when on, clear when off.
     private func toolbarButton(_ systemImage: String, label: LocalizedStringKey, active: Bool,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 19, weight: .semibold))
-                .foregroundStyle(active ? theme.onPrimary : theme.onSurfaceVariant)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(active ? theme.onTertiaryContainer : theme.onSurface)
                 .contentTransition(.symbolEffect(.replace))
-                .frame(width: 48, height: 48)
-                .contentShape(.circle)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(active ? theme.tertiaryContainer : .clear))
+                .contentShape(.rect(cornerRadius: 26))
         }
-        .buttonStyle(.plain)
-        .pixlGlass(in: Circle(),
-                   tint: active ? theme.primary.opacity(GlassTint.prominent)
-                                : theme.surfaceContainer.opacity(GlassTint.surface),
-                   interactive: true)
-        .glassEffectTransition(.materialize)
-        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: active)
+        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: active)
         .accessibilityLabel(label)
         .accessibilityAddTraits(active ? .isSelected : [])
     }
@@ -636,11 +698,15 @@ final class QueueReorderState {
     }
 }
 
-/// One queue row (Android `QueuePlaylistSongItem`): handle · 42 pt art · title / artist · playing indicator · ⋮,
-/// 16 pt vertical padding, 12 pt side insets. Swipe left removes (tension, then free; past 40 % it goes).
+/// One queue row (redesign 2, Android `QueuePlaylistSongItem` with a grouped shape, mockup AndroidQueue):
+/// `surfaceContainerHighest` glass in its grouped shape (20 / 4 pt corners), 64 pt min, 10 pt start / 4 pt end, 44 pt
+/// art with 12 pt corners, 12 pt, title 16/22 over artist 13/18, More (40 pt, 22 dp icon), then the drag handle
+/// (44 × 48 pt, upcoming songs only). Swipe left removes (tension, then free; past 40 % it goes) over a 4 pt-cornered
+/// `errorContainer` block.
 private struct QueueSongRow<Handle: Gesture>: View {
     let song: Song
     let isCurrent: Bool
+    let shape: UnevenRoundedRectangle
     let isPlaying: Bool
     let canReorder: Bool
     let isDragging: Bool
@@ -667,7 +733,6 @@ private struct QueueSongRow<Handle: Gesture>: View {
     @State private var inZone = false
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: isCurrent ? 40 : 22, style: .continuous)
         ZStack(alignment: .trailing) {
             if swipe < 0 {
                 Image(systemName: "xmark")
@@ -678,38 +743,28 @@ private struct QueueSongRow<Handle: Gesture>: View {
                     .padding(.trailing, 16)
                     .frame(width: -swipe, alignment: .trailing)
                     .frame(maxHeight: .infinity)
-                    .background(Capsule().fill(theme.errorContainer.opacity(inZone ? 1 : 0.82)))
-                    .padding(.trailing, 12)
+                    .background(RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(theme.errorContainer.opacity(inZone ? 1 : 0.82)))
             }
-            row(shape: shape)
+            row
                 .offset(x: swipe)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = max($0, 1) }
         .pixlHaptic(.impact(weight: .light), trigger: inZone)
     }
 
-    private func row(shape: RoundedRectangle) -> some View {
+    private var row: some View {
         HStack(spacing: 0) {
-            if canReorder {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(theme.onSurfaceVariant)
-                    .frame(width: 40, height: 40)
-                    .contentShape(.rect)
-                    .gesture(handle)
-                    .accessibilityLabel("Reorder song")
-            }
-            Spacer().frame(width: canReorder ? 6 : 12)
-            ArtworkView(song: song, size: 42, cornerRadius: isCurrent ? 21 : 8)
-            Spacer().frame(width: 16)
+            ArtworkView(song: song, size: 44, cornerRadius: 12)
+            Spacer().frame(width: 12)
             VStack(alignment: .leading, spacing: 0) {
                 Text(song.title)
-                    .pixlFont(.bodyLarge, weight: isCurrent ? .bold : .regular)
-                    .foregroundStyle(isCurrent ? theme.primary : theme.onSurface)
+                    .pixlFont(.custom(size: 16, lineHeight: 22))
+                    .foregroundStyle(theme.onSurface)
                     .lineLimit(1)
                 Text(song.displayArtist)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(isCurrent ? theme.primary.opacity(0.8) : theme.onSurfaceVariant)
+                    .pixlFont(.redesignRowSubtitle)
+                    .foregroundStyle(theme.onSurfaceVariant)
                     .lineLimit(1)
                 if let why {
                     // One quiet line in `primary`; its own tap (the row's tap still plays the song).
@@ -726,38 +781,37 @@ private struct QueueSongRow<Handle: Gesture>: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            if isCurrent {
-                PlayingIndicator(isPlaying: isPlaying, color: theme.secondary)
-                    .padding(.leading, 8)
-                Spacer().frame(width: 12)
-            } else {
-                Spacer().frame(width: 8)
-            }
             Button(action: onMore) {
                 Image(systemName: "ellipsis")
                     .rotationEffect(.degrees(90))
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(isCurrent ? theme.onTertiaryContainer : theme.onSurface)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(isCurrent ? theme.tertiaryContainer : theme.surfaceContainerHigh))
-                    .contentShape(Rectangle().inset(by: -4))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .frame(width: 40, height: 40)
+                    .contentShape(.rect)
             }
             .buttonStyle(PressScaleButtonStyle())
             .accessibilityLabel("More options for \(song.title)")
-            Spacer().frame(width: 14)
+            if canReorder {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .frame(width: 44, height: 48)
+                    .contentShape(.rect)
+                    .gesture(handle)
+                    .accessibilityLabel("Reorder song")
+            }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 16)
+        .padding(.leading, 10)
+        .padding(.trailing, 4)
+        .padding(.vertical, 10)
+        .frame(minHeight: 64)
         .contentShape(shape)
         .onTapGesture { if swipe == 0 { onTap() } }
         // Not `interactive`: interactive glass takes the touch for its press highlight and starved the scroll view of
         // pans that began on a row (only the margins around the rows scrolled).
-        .pixlGlass(in: shape, tint: (isCurrent ? theme.tertiaryContainer : theme.surfaceContainerLowest)
-            .opacity(isCurrent ? GlassTint.container : GlassTint.surface), interactive: false)
+        .pixlGlass(in: shape, tint: theme.surfaceContainerHighest.opacity(GlassTint.surface), interactive: false)
         .scaleEffect(isDragging ? 1.015 : 1)
         .animation(.spring(response: 0.3, dampingFraction: 1), value: isDragging)
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: isCurrent)
-        .padding(.horizontal, 12)
         .gesture(HorizontalRowSwipe(isEnabled: canReorder, onChanged: swipeChanged, onEnded: swipeEnded))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -848,5 +902,62 @@ private struct HorizontalRowSwipe: UIGestureRecognizerRepresentable {
             let v = pan.velocity(in: pan.view)
             return abs(v.x) > abs(v.y) * 1.2
         }
+    }
+}
+
+/// The current song in the queue list (redesign 2, Android `QueueNowPlayingCard`): an 80 pt `tertiaryContainer` glass
+/// card, 28 pt corners, 12 pt side padding; 56 pt art with 16 pt corners, 14 pt, "NOW PLAYING" 11/16 medium (0.8
+/// tracking), the title 17/22 bold, the artist 14/18; a 40 pt `tertiary` play / pause square (14 pt corners, `onTertiary`
+/// glyph, a fill on the card's glass) in a 56 pt touch box. A tap plays it from the start of its row's handler; a long
+/// press opens the song's options.
+private struct QueueNowPlayingCard: View {
+    let song: Song
+    let isPlaying: Bool
+    let onPlayPause: () -> Void
+    let onTap: () -> Void
+    let onLongPress: () -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        HStack(spacing: 14) {
+            ArtworkView(song: song, size: 56, cornerRadius: 16)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(String(localized: "Now playing").uppercased())
+                    .pixlFont(.custom(size: 11, weight: .medium, lineHeight: 16, tracking: 0.8))
+                Text(song.title)
+                    .pixlFont(.custom(size: 17, weight: .bold, lineHeight: 22))
+                    .lineLimit(1)
+                Text(song.displayArtist)
+                    .pixlFont(.custom(size: 14, lineHeight: 18))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(theme.onTertiaryContainer)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            Button(action: onPlayPause) {
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(theme.onTertiary)
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 40, height: 40)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(theme.tertiary))
+                    .frame(width: 56, height: 56)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PressScaleButtonStyle())
+            .accessibilityLabel(isPlaying ? "Pause" : "Play")
+            .accessibilityIdentifier("queue.nowPlaying.playPause")
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 80)
+        .contentShape(shape)
+        .onTapGesture(perform: onTap)
+        .onLongPressGesture(minimumDuration: 0.45, perform: onLongPress)
+        .pixlGlass(in: shape, tint: theme.tertiaryContainer.opacity(GlassTint.container))
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(named: "More options", onLongPress)
+        .accessibilityIdentifier("queue.nowPlaying")
     }
 }
