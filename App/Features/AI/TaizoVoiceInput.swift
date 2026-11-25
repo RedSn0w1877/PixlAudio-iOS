@@ -125,7 +125,7 @@ final class TaizoVoiceInput {
     /// The recognizer answers on its own queue: the values are copied and handed to the main actor.
     nonisolated private static func resultHandler(
         _ deliver: @escaping @MainActor @Sendable (String?, Bool, Bool) -> Void
-    ) -> (SFSpeechRecognitionResult?, Error?) -> Void {
+    ) -> @Sendable (SFSpeechRecognitionResult?, Error?) -> Void {
         { result, error in
             let text = result?.bestTranscription.formattedString
             let isFinal = result?.isFinal ?? false
