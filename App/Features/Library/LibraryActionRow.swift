@@ -1,98 +1,131 @@
 import PixlModel
 import SwiftUI
 
-/// Android `LibraryActionRow` (42 pt high): the main action — Shuffle (its icon spins when coming from Playlists),
-/// or on Playlists the New button — and on the trailing side the connected run of
-/// [locate] [instrumental filter] [sort] (26 pt outer corners, 8 pt inner, 4 pt gaps). Colours: main
-/// `tertiaryContainer`, the icon buttons `secondaryContainer` (the active instrumental filter `primary`) — all as
-/// tinted glass. (The storage filter, the M3U Import button and the Folders breadcrumbs went with the local songs.)
-struct LibraryActionRow: View {
+/// Redesign 2 (Android `LibraryToolsRow`, mockup AndroidLibrary): the row under the tab chips, 48 pt tall inside the
+/// 16 pt gutter. On the left the sort as a text button (40 pt, 20 pt corners, 8 / 12 pt padding, 20 dp sort icon,
+/// 6 pt gap, the current sort's name 14/20 medium) that opens Sort by as a small system menu; on the right a connected
+/// group of 44 × 40 pt buttons (20 / 6 pt corners, 2 pt apart): Locate (when the current song is off screen),
+/// Instrumental-only (Songs), List | Grid (Albums). Each group button is tinted glass; the selected one is `primary`.
+struct LibraryToolsRow: View {
     let tab: LibraryTab
     let showsLocate: Bool
     let isInstrumentalizedOnly: Bool
-    let onMainAction: () -> Void
     let onLocate: () -> Void
     let onInstrumentalFilter: () -> Void
-    /// The tab's sort preferences, for the Sort by menu.
+    /// The tab's sort preferences, for the Sort by menu and its label.
     let prefs: LibraryPreferences
 
     @Environment(\.appTheme) private var theme
-    @State private var iconRotation: Double = 360
+    @Environment(SettingsStore.self) private var settings
 
-    private static let height: CGFloat = 42
-    private static let outer: CGFloat = 26
-    private static let inner: CGFloat = 8
+    private enum Kind: Hashable { case locate, instrumental, list, grid }
 
     var body: some View {
         HStack(spacing: 0) {
-            mainActions
+            sortButton
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer().frame(width: Tokens.Spacing.s)
-            trailingButtons
+            let kinds = buttonKinds
+            if !kinds.isEmpty {
+                Spacer().frame(width: 8)
+                GlassEffectContainer(spacing: 1) {
+                    HStack(spacing: Redesign.groupGap) {
+                        ForEach(Array(kinds.enumerated()), id: \.element) { index, kind in
+                            groupButton(kind, position: .of(index, count: kinds.count))
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                        }
+                    }
+                }
+            }
         }
-        .padding(.leading, 4)
-        .padding(.trailing, 4)
-        .onChange(of: tab, initial: true) { _, newTab in
-            withAnimation(.easeInOut(duration: 0.3)) { iconRotation = newTab == .playlists ? 0 : 360 }
+        .frame(height: 48)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showsLocate)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tab)
+    }
+
+    private var buttonKinds: [Kind] {
+        var kinds: [Kind] = []
+        if showsLocate { kinds.append(.locate) }
+        if tab == .songs { kinds.append(.instrumental) }
+        if tab == .albums { kinds += [.list, .grid] }
+        return kinds
+    }
+
+    /// The sort as a text button; Sort by is a small system menu that morphs out of it (owner change 2026-10-02).
+    private var sortButton: some View {
+        let current = prefs.sort(for: tab)
+        return Menu {
+            LibrarySortMenuContent(tab: tab, prefs: prefs)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 17, weight: .medium))
+                    .frame(width: 20, height: 20)
+                Text(current.displayName)
+                    .pixlFont(.redesignLabel)
+                    .lineLimit(1)
+                    .frame(maxWidth: 200, alignment: .leading)
+            }
+            .foregroundStyle(theme.onSurface)
+            .padding(.leading, 8)
+            .padding(.trailing, 12)
+            .frame(height: 40)
+            .contentShape(.rect(cornerRadius: 20))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Sort options, \(current.displayName)")
+        .accessibilityIdentifier("library.sort")
+    }
+
+    private func groupButton(_ kind: Kind, position: GroupPosition) -> some View {
+        let isListView = settings.library.isAlbumsListView
+        let selected: Bool = switch kind {
+        case .locate: false
+        case .instrumental: isInstrumentalizedOnly
+        case .list: isListView
+        case .grid: !isListView
+        }
+        return RedesignGroupButton(position: position, isSelected: selected, height: 40, inner: 6,
+                                   horizontalPadding: 0, action: {
+            switch kind {
+            case .locate: onLocate()
+            case .instrumental: onInstrumentalFilter()
+            case .list: withAnimation(PixlMotion.state) { settings.library.isAlbumsListView = true }
+            case .grid: withAnimation(PixlMotion.state) { settings.library.isAlbumsListView = false }
+            }
+        }) { tint in
+            Image(systemName: symbol(kind))
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(tint)
+        }
+        .frame(width: 44)
+        .accessibilityLabel(label(kind))
+        .accessibilityIdentifier(identifier(kind))
+    }
+
+    private func symbol(_ kind: Kind) -> String {
+        switch kind {
+        case .locate: "scope"
+        case .instrumental: "mic.slash"
+        case .list: "list.bullet"
+        case .grid: "square.grid.2x2"
         }
     }
 
-    private var mainActions: some View {
-        let isPlaylists = tab == .playlists
-        return GlassEffectContainer(spacing: 2) {
-            HStack(spacing: Tokens.Spacing.s) {
-                SegmentedGlassButton(title: isPlaylists ? "New" : "Shuffle",
-                                     systemImage: isPlaylists ? "text.badge.plus" : "shuffle",
-                                     accessibilityLabel: isPlaylists ? "Create new playlist" : "Shuffle Play",
-                                     leading: Self.outer, trailing: Self.outer,
-                                     height: Self.height, tint: theme.tertiaryContainer.opacity(GlassTint.prominent),
-                                     foreground: theme.onTertiaryContainer,
-                                     iconRotation: isPlaylists ? 0 : iconRotation, action: onMainAction)
-                    .accessibilityIdentifier("library.mainAction")
-            }
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isPlaylists)
+    private func label(_ kind: Kind) -> LocalizedStringKey {
+        switch kind {
+        case .locate: "Locate current song"
+        case .instrumental: isInstrumentalizedOnly ? "Showing instrumentals only" : "Show instrumentals only"
+        case .list: "List view"
+        case .grid: "Grid view"
         }
     }
 
-    private var showsInstrumentalFilter: Bool { tab == .songs }
-
-    private var trailingButtons: some View {
-        let tonal = theme.secondaryContainer.opacity(GlassTint.prominent)
-        let onTonal = theme.onSecondaryContainer
-        return GlassEffectContainer(spacing: 2) {
-            HStack(spacing: 0) {
-                if showsLocate {
-                    SegmentedGlassButton(systemImage: "scope", accessibilityLabel: "Locate current song",
-                                         leading: Self.outer, trailing: Self.inner, height: Self.height,
-                                         tint: tonal, foreground: onTonal, action: onLocate)
-                        .padding(.trailing, 4)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-                if showsInstrumentalFilter {
-                    SegmentedGlassButton(systemImage: "mic.slash",
-                                         accessibilityLabel: isInstrumentalizedOnly ? "Showing instrumentals only"
-                                                                                   : "Show instrumentals only",
-                                         leading: showsLocate ? Self.inner : Self.outer,
-                                         trailing: Self.inner, height: Self.height,
-                                         tint: isInstrumentalizedOnly ? theme.primary.opacity(GlassTint.prominent) : tonal,
-                                         foreground: isInstrumentalizedOnly ? theme.onPrimary : onTonal,
-                                         action: onInstrumentalFilter)
-                        .padding(.trailing, 4)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-                // Sort by is a small system menu that morphs out of this segment (owner change 2026-10-02).
-                let sortLeading = (showsLocate || showsInstrumentalFilter) ? Self.inner : Self.outer
-                ShapedGlassMenu(systemImage: "line.3.horizontal.decrease", accessibilityLabel: "Sort options",
-                                shape: UnevenRoundedRectangle(topLeadingRadius: sortLeading, bottomLeadingRadius: sortLeading,
-                                                              bottomTrailingRadius: Self.outer, topTrailingRadius: Self.outer,
-                                                              style: .continuous),
-                                width: Self.height, height: Self.height, tint: tonal, foreground: onTonal) {
-                    LibrarySortMenuContent(tab: tab, prefs: prefs)
-                }
-                .accessibilityIdentifier("library.sort")
-            }
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showsLocate)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tab)
+    private func identifier(_ kind: Kind) -> String {
+        switch kind {
+        case .locate: "library.locate"
+        case .instrumental: "library.instrumentalFilter"
+        case .list: "library.view.list"
+        case .grid: "library.view.grid"
         }
     }
 }
@@ -131,5 +164,39 @@ struct LibrarySelectionActionRow: View {
                 .accessibilityIdentifier("selection.options")
         }
         .padding(.horizontal, 4)
+    }
+}
+
+/// Redesign 2 (Android `LibraryTabChips`): one filter chip per library tab in the user's order, 8 pt apart, 16 pt
+/// content padding, then an outlined Edit chip (the reorder sheet). The selected chip scrolls into view.
+struct LibraryTabChips: View {
+    let tabs: [LibraryTab]
+    let selected: LibraryTab
+    let onSelect: (LibraryTab) -> Void
+    let onEdit: () -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                GlassEffectContainer(spacing: 4) {
+                    HStack(spacing: 8) {
+                        ForEach(tabs, id: \.self) { tab in
+                            RedesignFilterChip(label: tab.tabTitle, isSelected: tab == selected) { onSelect(tab) }
+                                .id(tab)
+                                .accessibilityIdentifier("library.tab.\(tab.tabTitle)")
+                        }
+                        RedesignFilterChip(label: "", isSelected: false, leadingSystemImage: "pencil", action: onEdit)
+                            .accessibilityLabel("Reorder tabs")
+                            .accessibilityIdentifier("library.tab.accessory")
+                    }
+                    .padding(.horizontal, Redesign.gutter)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+            .onChange(of: selected) { _, tab in
+                withAnimation(PixlMotion.selection) { proxy.scrollTo(tab) }
+            }
+        }
     }
 }

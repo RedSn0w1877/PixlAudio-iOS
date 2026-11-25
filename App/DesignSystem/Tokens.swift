@@ -56,25 +56,26 @@ nonisolated enum Tokens {
         static let miniPlayerSpacing: CGFloat = 12
     }
 
-    /// Mini player content (`MiniPlayerContentInternal`).
+    /// Mini player content (`MiniPlayerContentInternal`, redesign 2 2026-11-25).
     enum MiniPlayer {
-        static let artSize: CGFloat = 44
-        static let leadingPadding: CGFloat = 10
-        static let trailingPadding: CGFloat = 12
+        /// The cover, in the Cookie9 shape.
+        static let artSize: CGFloat = 48
+        static let leadingPadding: CGFloat = 8
+        static let trailingPadding: CGFloat = 6
         static let artSpacing: CGFloat = 12
-        static let buttonSize: CGFloat = 36
-        static let buttonIconSize: CGFloat = 22
-        static let buttonSpacing: CGFloat = 8
-        /// The transport buttons' touch area (Compose extends small clickables to 48 dp; iOS asks for 44 pt): the
-        /// 36 pt circles sit centred in it, so the 8 pt gaps between them are now part of the buttons.
-        static let buttonHitSize: CGFloat = 44
-        /// Play / pause inside its progress ring (new UI, 2026-11-16): the fill shrinks to leave room for the ring,
-        /// which runs round the 44 pt touch area, 2.5 pt thick.
-        static let playButtonSize: CGFloat = 34
-        static let ringDiameter: CGFloat = 44
-        static let ringLineWidth: CGFloat = 2.5
-        /// Extra room each side of the ringed play button, so the ring clears the previous / next circles.
-        static let ringSpacing: CGFloat = 2
+        /// Previous / next: bare glyphs (24 / 26 dp icons) in a 44 × 48 pt touch area.
+        static let buttonHitWidth: CGFloat = 44
+        static let buttonHitHeight: CGFloat = 48
+        static let previousIconSize: CGFloat = 20
+        static let nextIconSize: CGFloat = 22
+        /// Play / pause: 48 pt `primary`, 16 pt corners while playing, a circle while paused; 22 dp icon.
+        static let playButtonSize: CGFloat = 48
+        static let playCornerPlaying: CGFloat = 16
+        static let playIconSize: CGFloat = 19
+        /// The progress line: 3 pt thick, 24 pt in from each end (clear of the 32 pt corners), 5 pt up.
+        static let lineHeight: CGFloat = 3
+        static let lineInset: CGFloat = 24
+        static let lineBottom: CGFloat = 5
     }
 
     /// The full player's bottom split pills (new UI, 2026-11-16, mockup `iOSPlayer`): a big capsule (shuffle, repeat,
