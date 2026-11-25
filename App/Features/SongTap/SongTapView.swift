@@ -118,22 +118,7 @@ struct SongTapView: View {
             stopCamera()
         }
         // "Song drop to X?": for a phone the listener picked from the list, or for one that came inside the strict near gate.
-        .alert(dropTitle(asking(ui)), isPresented: Binding(get: { asking(ui) != nil }, set: { if !$0 { picked = nil } }),
-               presenting: asking(ui)) { entry in
-            Button(SongTapStrings.dropYes) {
-                answered = entry.id
-                picked = nil
-                controller.approve(peer: entry.id, name: entry.name)
-            }
-            Button(SongTapStrings.dropNo, role: .cancel) {
-                answered = entry.id
-                picked = nil
-                controller.decideNo(peer: entry.id)
-            }
-        } message: { _ in
-            Text(SongTapStrings.dropConfirmBody(ui.nowPlaying?.title ?? ""))
-        }
-        .onChange(of: ui.prompt?.id) { _, new in if new != answered { answered = nil } }
+        .songDropAsk(ui: ui, enabled: mode == .send && !useCode, picked: $picked, answered: $answered, controller: controller)
         .onChange(of: scenePhase) { _, _ in sync(controller) }
         .onChange(of: ui.allowed) { _, _ in sync(controller) }
         .onChange(of: mode) { _, new in
@@ -147,20 +132,6 @@ struct SongTapView: View {
         .onChange(of: qrMode) { _, _ in syncCamera(controller) }
         .onChange(of: env.playback.current?.id) { _, _ in controller.nowPlayingChanged(env.playback.current) }
         .accessibilityIdentifier("screen.songTap")
-    }
-
-    // MARK: Song Drop: the question
-
-    private func dropTitle(_ entry: SongTapNearbyEntry?) -> String { SongTapStrings.dropConfirmTitle(entry?.name ?? "") }
-
-    /// The phone to ask "Song drop to X?" about: the one picked from the list, else the one the route says is inside the near gate. Only
-    /// while sending Bluetooth, waiting, with a song that can be sent and no code on screen.
-    private func asking(_ ui: SongTapUiState) -> SongTapNearbyEntry? {
-        let waiting = ui.phase == .armed || ui.phase == .found || ui.phase == .near
-        guard ui.allowed, mode == .send, !useCode, waiting, ui.nowPlaying?.canSend == true else { return nil }
-        if let picked { return picked }
-        if let prompt = ui.prompt, prompt.id != answered { return prompt }
-        return nil
     }
 
     // MARK: Arming and the camera
@@ -395,7 +366,7 @@ struct SongTapView: View {
                 let armed = ui.session.target != 0 && ui.phase == .offered
                 let status = statusLine(ui)
                 if armed {
-                    armedCard(controller, ui)
+                    SongDropArmedCard(peerName: ui.peerName) { controller.cancelDrop() }
                 } else if !useCode {
                     Text(status ?? SongTapStrings.sendHint)
                         .pixlFont(.titleSmall)
@@ -410,7 +381,7 @@ struct SongTapView: View {
                 }
                 let waitingPhase = ui.phase == .armed || ui.phase == .found || ui.phase == .near
                 if !armed, !useCode, waitingPhase, ui.bluetooth == .active {
-                    nearbyList(ui)
+                    SongDropNearbyList(entries: ui.nearby) { picked = $0 }
                 }
                 if armed {
                     EmptyView()
@@ -453,75 +424,6 @@ struct SongTapView: View {
                 .foregroundStyle(theme.onSurfaceVariant)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    /// The phones that advertise as receivers inside the list gate, strongest first. A row is "Close" inside the near gate, "Nearby"
-    /// otherwise; a tap on it asks "Song drop to X?".
-    private func nearbyList(_ ui: SongTapUiState) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(SongTapStrings.dropNearbyTitle)
-                .pixlFont(.titleSmall)
-                .foregroundStyle(theme.primary)
-            if ui.nearby.isEmpty {
-                Text(SongTapStrings.dropNearbyEmpty)
-                    .pixlFont(.bodyMedium)
-                    .foregroundStyle(theme.onSurfaceVariant)
-            }
-            ForEach(ui.nearby, id: \.id) { entry in
-                Button { picked = entry } label: {
-                    GlassCard(cornerRadius: 24, tint: theme.surfaceContainerHigh) {
-                        HStack(spacing: 14) {
-                            Image(systemName: "iphone.gen3")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(theme.primary)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(entry.name)
-                                    .pixlFont(.titleMedium)
-                                    .foregroundStyle(theme.onSurface)
-                                    .lineLimit(1)
-                                Text(entry.near ? SongTapStrings.dropSignalClose : SongTapStrings.dropSignalNearby)
-                                    .pixlFont(.bodySmall)
-                                    .foregroundStyle(theme.onSurfaceVariant)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .contentShape(.rect)
-                    }
-                }
-                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.97))
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("songTap.nearby.\(entry.id)")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(PixlMotion.state, value: ui.nearby.map(\.id))
-    }
-
-    /// After a yes: the sender waits for the touch, armed to that one phone.
-    private func armedCard(_ controller: SongTapController, _ ui: SongTapUiState) -> some View {
-        GlassCard(cornerRadius: 28, tint: theme.primaryContainer) {
-            VStack(spacing: 8) {
-                Image(systemName: "iphone.radiowaves.left.and.right")
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(theme.onPrimaryContainer)
-                    .accessibilityHidden(true)
-                Text(SongTapStrings.dropArmedTitle)
-                    .pixlFont(.headlineSmall)
-                    .foregroundStyle(theme.onPrimaryContainer)
-                    .multilineTextAlignment(.center)
-                Text(SongTapStrings.dropArmedTo(ui.peerName ?? SongTapStrings.dropOtherPhone))
-                    .pixlFont(.titleMedium)
-                    .foregroundStyle(theme.onPrimaryContainer)
-                    .multilineTextAlignment(.center)
-                textButton(SongTapStrings.dropArmedCancel, id: "songTap.cancelDrop") { controller.cancelDrop() }
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity)
-        }
-        .accessibilityIdentifier("songTap.armed")
     }
 
     // MARK: Receive

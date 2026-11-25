@@ -11,11 +11,18 @@ struct SongTapDiagnosticsView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.appTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(Router.self) private var router
 
     @State private var mode: SongTapRole = .send
     @State private var snapshot = SongTapDiagSnapshot()
     @State private var events: [SongTapDiagEvent] = []
     @State private var copied = false
+    /// A phone picked from the nearby list, waiting for its "Song drop to X?" answer (the same question the Song Tap screen asks), and
+    /// the phone just answered.
+    @State private var picked: SongTapNearbyEntry?
+    @State private var answered: Int?
+    /// "Open Song Tap" was pressed: the Song Tap screen arms itself, so leaving this one for it must not disarm.
+    @State private var openingSongTap = false
 
     private static let marks = ["touching", "1 cm", "3 cm", "10 cm", "30 cm"]
 
@@ -29,6 +36,7 @@ struct SongTapDiagnosticsView: View {
                     .foregroundStyle(theme.onSurfaceVariant)
             } else {
                 modeSwitch(controller)
+                if mode == .send { songDropBlock(controller, ui) }
                 sensitivityPicker(controller)
                 block(SongTapStrings.diagSignal) {
                     line("status", snapshot.status.rawValue)
@@ -59,6 +67,8 @@ struct SongTapDiagnosticsView: View {
                     line("may connect and beam", snapshot.mayConnect ? "yes" : "no")
                     line("shown in the picker", snapshot.listed ? "yes" : "no")
                     line("offer in hand", snapshot.offerInHand ? "yes" : "no")
+                    line("radio starts", String(snapshot.radioStarts))
+                    if !snapshot.tapNote.isEmpty { line("last ignored tap", snapshot.tapNote) }
                     line("names", snapshot.names.isEmpty ? "-" : snapshot.names)
                     line("advertises", SongTapNames.advertName(SongTapNames.orFallback(controller.name)))
                     line("full name", SongTapNames.orFallback(controller.name))
@@ -115,7 +125,10 @@ struct SongTapDiagnosticsView: View {
             }
             Spacer().frame(height: 24)
         }
+        .songDropAsk(ui: ui, enabled: mode == .send, picked: $picked, answered: $answered, controller: controller)
         .onAppear {
+            openingSongTap = false
+            controller.nowPlayingChanged(env.playback.current)
             let diag = controller.diagnostics
             diag.onChange = { snapshot = diag.snapshot; events = diag.events }
             diag.setEnabled(true)
@@ -124,8 +137,9 @@ struct SongTapDiagnosticsView: View {
         }
         .onDisappear {
             controller.diagnostics.setEnabled(false)
-            controller.disarm()
+            if !openingSongTap { controller.disarm() }
         }
+        .onChange(of: env.playback.current?.id) { _, _ in controller.nowPlayingChanged(env.playback.current) }
         .onChange(of: scenePhase) { _, _ in sync(controller) }
         .onChange(of: ui.allowed) { _, _ in sync(controller) }
         .onChange(of: mode) { _, new in
@@ -183,6 +197,40 @@ struct SongTapDiagnosticsView: View {
             "near \(s.near), \(s.connection), detector \(s.detector)\n"
         let device = "\(UIDevice.current.model), \(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
         return head + controller.diagnostics.copyLog(device: device)
+    }
+
+    // MARK: Song Drop
+
+    /// Where taps get their yes. A sender only beams to a phone it said yes to, and a tap with no yes is ignored, so the list of phones
+    /// nearby and the "Song drop to X?" question are here too, not only on the Song Tap screen (the question itself is `SongDropAsk`).
+    @ViewBuilder
+    private func songDropBlock(_ controller: SongTapController, _ ui: SongTapUiState) -> some View {
+        let armed = ui.session.target != 0 && ui.phase == .offered
+        if armed {
+            SongDropArmedCard(peerName: ui.peerName) { controller.cancelDrop() }
+        } else {
+            block(SongTapStrings.diagYesTitle) {
+                Text(snapshot.needsYes ? SongTapStrings.diagSayYesNow : SongTapStrings.diagSayYes)
+                    .pixlFont(.bodyMedium)
+                    .foregroundStyle(snapshot.needsYes ? theme.error : theme.onSurfaceVariant)
+                    .fixedSize(horizontal: false, vertical: true)
+                if ui.nowPlaying?.canSend != true {
+                    Text(SongTapStrings.diagNothingToSend)
+                        .pixlFont(.bodySmall)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    SongDropNearbyList(entries: ui.nearby) { picked = $0 }
+                        .padding(.top, 4)
+                }
+                chip(SongTapStrings.diagOpenSongTap) {
+                    openingSongTap = true
+                    router.present(AppCover.songTap)
+                }
+                .accessibilityIdentifier("songTapDiagnostics.openSongTap")
+                .padding(.top, 4)
+            }
+        }
     }
 
     // MARK: Pieces
