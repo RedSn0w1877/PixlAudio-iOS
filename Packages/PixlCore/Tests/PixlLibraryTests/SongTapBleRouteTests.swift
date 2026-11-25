@@ -937,4 +937,191 @@ struct SongTapBleRouteTests {
         #expect(nested == 0)
         #expect(rig.radio.calls.contains("readOffer:S"))
     }
+
+    // MARK: Follow-up 2: the phone, not the address (Android `BleTransportTest`, 2026-11-25)
+
+    private func logged(_ rig: BleRig, _ text: String) -> Int { rig.diag.events.filter { $0.text.contains(text) }.count }
+
+    @Test func aPhoneThatChangesItsAddressWhileArmedKeepsItsNumberStillGetsTheOfferAndItsTapIsAccepted() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        let peer = rig.founds.last!
+        _ = rig.route.serverControl(client: "c", value: Self.hello(1))
+        rig.route.publishOffer(peer: peer, payload: Self.payloadBytes)
+        #expect(rig.radio.notifications.count == 1)
+
+        // The old address goes quiet and the same name shows up under a new one.
+        rig.clock.advance(2_000)
+        rig.settle("R2", .receive, name: "Ann")
+
+        #expect(rig.founds == [peer])
+        #expect(rig.losts.isEmpty)
+        #expect(logged(rig, "changed its address") == 1)
+        #expect(rig.route.nearby.map(\.id) == [peer])
+        // The phones that are connected are told again there is an offer.
+        #expect(rig.radio.notifications.count == 2)
+        #expect(SongTapWire.isOfferReady(rig.radio.notifications.last!.value))
+        // It is served, and its tap message is believed.
+        #expect(rig.route.serverOffer(client: "c") != nil)
+        _ = rig.route.serverControl(client: "c", value: SongTapWire.encodeTap(ageMs: 30))
+        #expect(rig.taps == [peer])
+    }
+
+    @Test func theNewAddressesOwnTapCountsForThePinnedPhone() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        let peer = rig.founds.last!
+        rig.route.publishOffer(peer: peer, payload: Self.payloadBytes)
+        rig.clock.advance(2_000)
+        rig.settle("R2", .receive, name: "Ann")
+        rig.touch("R2", .receive)
+        #expect(rig.taps == [peer])
+    }
+
+    @Test func theOldAddressIsNotGivenUpForAPhoneThatIsStillBeingHeard() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        rig.route.publishOffer(peer: rig.founds.last!, payload: Self.payloadBytes)
+        // The twin shows up at once, while the pinned address is still talking: nothing is re-pinned.
+        rig.settle("R2", .receive, name: "Ann")
+        #expect(logged(rig, "changed its address") == 0)
+    }
+
+    @Test func aStaleTwinOfTheSamePhoneDoesNotStopTheOfferBeingServed() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        let chosen = rig.founds.last!
+        rig.settle("R2", .receive, name: "Ann")
+        rig.route.publishOffer(peer: chosen, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "c", value: Self.hello(5))
+        #expect(rig.route.serverOffer(client: "c") != nil)
+    }
+
+    @Test func twoDifferentNamesNearStillServeNobody() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        let chosen = rig.founds.last!
+        rig.settle("R2", .receive, name: "Bo")
+        rig.route.publishOffer(peer: chosen, payload: Self.payloadBytes)
+        _ = rig.route.serverControl(client: "c", value: Self.hello(5))
+        #expect(rig.route.serverOffer(client: "c") == nil)
+        // Even when one of them changes address and the other stays: a different name is a different phone.
+        rig.clock.advance(2_000)
+        rig.settle("R3", .receive, name: "Bo")
+        #expect(logged(rig, "changed its address") == 0)
+        #expect(rig.route.serverOffer(client: "c") == nil)
+    }
+
+    @Test func thePromptStaysUpWhileTheSameNamedPhoneChangesAddressAndNoSilencesEveryAddressItHas() {
+        let rig = BleRig()
+        rig.route.start(role: .send)
+        rig.settle("R1", .receive, name: "Ann")
+        rig.advance(300)
+        #expect(rig.route.prompt?.name == "Ann")
+        rig.clock.advance(2_000)
+        var seen: [String?] = []
+        for _ in 0..<6 {
+            rig.see("R2", .receive, BleRig.nearDbm, name: "Ann")
+            seen.append(rig.route.prompt?.name)
+        }
+        #expect(!seen.contains(nil), "the question never vanishes: \(seen)")
+
+        rig.route.ignorePrompt(rig.route.prompt!.id)
+        #expect(rig.route.prompt == nil)
+        // A third address of the same phone is not asked about either.
+        rig.clock.advance(2_000)
+        for _ in 0..<6 { rig.see("R3", .receive, BleRig.nearDbm, name: "Ann") }
+        rig.advance(300)
+        #expect(rig.route.prompt == nil)
+    }
+
+    // MARK: Follow-up 2: taps with no yes are never silent
+
+    @Test func aSenderThatFeltATapWithNoYesSaysSoInTheLogAndTheDiagnosticsAtMostEveryTwoSecondsAndAYesClearsIt() {
+        let rig = BleRig()
+        rig.diag.setEnabled(true)
+        rig.route.start(role: .send)
+        rig.settle("R", .receive, name: "Ann")
+        rig.touch("R", .receive)
+        #expect(rig.taps.isEmpty)
+        #expect(logged(rig, "tap ignored: no yes yet") == 1)
+        rig.see("R", .receive, BleRig.touchDbm, stepMs: 200)
+        #expect(rig.diag.snapshot.needsYes)
+        #expect(rig.diag.snapshot.tapNote.contains("tap ignored: no yes yet"))
+
+        // Pull apart and touch again inside two seconds: counted, not logged again.
+        rig.settle("R", .receive, samples: 8)
+        rig.touch("R", .receive, samples: 4)
+        #expect(logged(rig, "tap ignored: no yes yet") == 1)
+
+        // Saying yes clears the hint.
+        rig.route.publishOffer(peer: rig.founds.last!, payload: Self.payloadBytes)
+        rig.see("R", .receive, BleRig.touchDbm, stepMs: 200)
+        #expect(!rig.diag.snapshot.needsYes)
+        #expect(rig.diag.snapshot.tapNote.isEmpty)
+    }
+
+    // MARK: Follow-up 2: the radio is not restarted, and a stalled connection gives up
+
+    @Test func startingAgainWithTheSameRoleAndNameDoesNotRestartTheRadio() {
+        let rig = BleRig()
+        rig.route.start(role: .receive)
+        rig.route.start(role: .receive)
+        rig.route.start(role: .receive)
+        #expect(rig.radio.count("start") == 1)
+        #expect(rig.radio.count("stop") == 0)
+        #expect(logged(rig, "advertising start (receive)") == 1)
+        #expect(logged(rig, "not restarted") == 2)
+        #expect(rig.route.status == .active)
+
+        // A different role or name is a real change.
+        rig.route.start(role: .send)
+        #expect(rig.radio.count("start") == 2)
+        #expect(logged(rig, "advertising stop (receive)") == 1)
+        #expect(logged(rig, "advertising start (send)") == 1)
+        rig.route.setOwnName("Zed")
+        rig.route.start(role: .send)
+        #expect(rig.radio.count("start") == 3)
+        #expect(rig.radio.advertisedName == "Zed")
+        // Bluetooth that never came up is tried again.
+        let off = BleRig()
+        off.radio.startStatus = .bluetoothOff
+        off.route.start(role: .receive)
+        off.radio.startStatus = .active
+        off.route.start(role: .receive)
+        #expect(off.radio.count("start") == 2)
+    }
+
+    @Test func aConnectionThatStallsIsGivenUpAfterThreeSecondsAndALateAnswerIsClosed() {
+        let rig = BleRig()
+        rig.route.start(role: .receive)
+        rig.settle("S", .send)
+        #expect(rig.radio.count("connect") == 1)
+        // Nothing answers; the phone keeps advertising. Before the timeout it is still waited for.
+        for _ in 0..<2 {
+            rig.see("S", .send, BleRig.nearDbm, stepMs: 1_000)
+            rig.scheduler.pump()
+        }
+        #expect(rig.radio.count("disconnect") == 0)
+        for _ in 0..<2 {
+            rig.see("S", .send, BleRig.nearDbm, stepMs: 1_000)
+            rig.scheduler.pump()
+        }
+        #expect(rig.radio.count("disconnect") == 1)
+        #expect(logged(rig, "took too long") == 1)
+        #expect(rig.radio.count("connect") == 1)
+        // The stalled attempt answers after all: closed, not mistaken for a connection.
+        rig.listener.onConnected(address: "S", ok: true)
+        #expect(rig.radio.count("readName") == 0)
+        #expect(rig.hellos.isEmpty)
+        #expect(rig.radio.count("disconnect") == 2)
+        // A new attempt follows after the usual pause.
+        rig.see("S", .send, BleRig.nearDbm, stepMs: SongTapBleTuning.reconnectMs + 100)
+        #expect(rig.radio.count("connect") == 2)
+    }
 }

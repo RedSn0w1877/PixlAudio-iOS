@@ -110,6 +110,13 @@ nonisolated enum SongTapStrings {
     static var diagGateNow: String { String(localized: "Gate now") }
     static var diagHoldLevel: String { String(localized: "Gentle hold fires at") }
     static var diagPeerTap: String { String(localized: "One-sided tap") }
+    static var diagYesTitle: String { String(localized: "Say yes first") }
+    static var diagSayYes: String { String(localized: "Taps only send to a phone you said yes to. Pick one below, or answer when Song drop pops up.") }
+    static var diagSayYesNow: String {
+        String(localized: "Your phone felt a tap, but nobody got a yes yet, so nothing was sent. Say yes to a phone below first.")
+    }
+    static var diagNothingToSend: String { String(localized: "Play a song that can be shared first, then the phones nearby show up here.") }
+    static var diagOpenSongTap: String { String(localized: "Open Song Tap") }
 
     // MARK: Sensitivity (Settings > Song Tap, and the diagnostics screen)
 

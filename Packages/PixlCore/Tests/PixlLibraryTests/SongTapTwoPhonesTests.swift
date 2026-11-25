@@ -450,6 +450,19 @@ struct SongTapTwoPhonesTests {
         #expect(p.b.library.removed.isEmpty)
     }
 
+    @Test func armingAgainAsTheSameRoleOrAPauseAndResumeNeverRestartsTheRadioMoreThanNeeded() {
+        let a = Phone(name: "A", clock: SongTapTestClock(), playing: Self.payload())
+        a.arm(.receive)
+        a.arm(.receive) // a resume that followed no pause, or a second screen
+        #expect(a.radio.calls.filter { $0 == "start" }.count == 1)
+        #expect(!a.radio.calls.contains("stop"))
+        // A real pause and resume stops and starts once each.
+        a.engine.disarm()
+        a.arm(.receive)
+        #expect(a.radio.calls.filter { $0 == "start" }.count == 2)
+        #expect(a.phase == .armed)
+    }
+
     @Test func leavingTheScreenStopsTheRadioAndTheSensorOnBothPhones() async {
         let p = Self.pair()
         p.settle()

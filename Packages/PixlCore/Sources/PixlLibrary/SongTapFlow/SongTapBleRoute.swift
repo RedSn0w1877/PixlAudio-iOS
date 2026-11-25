@@ -57,6 +57,12 @@ public enum SongTapBleTuning {
     public static let prefetchMaxAgeMs: Int64 = 20_000
     /// The nearby list and the prompt are republished at most this often.
     public static let nearbyPublishMs: Int64 = 250
+    /// A tap that is ignored (no yes yet, or not the phone said yes to) is written to the log at most this often.
+    public static let tapIgnoredLogMs: Int64 = 2_000
+    /// The "Song drop to X?" prompt stays up this long while the same named phone shows up under a new address.
+    public static let promptGraceMs: Int64 = 3_000
+    /// A recent ignored tap with no yes is shown as a hint on the screens for this long.
+    public static let needsYesHintMs: Int64 = 15_000
 }
 
 /// "No usable signal" for the one-sided tap rule: far below any gate.
@@ -94,7 +100,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     }
 
     private final class Peer {
-        let id: Int
+        var id: Int
         let address: String
         var role = SongTapRole.send
         var lastSeenMs: Int64 = 0
@@ -119,6 +125,8 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         var lastFireMs: Int64 = -1
         var lastJumpMs: Int64 = -1
         var connectStartedMs: Int64 = 0
+        /// A connection attempt was given up on; a late answer from it must not be taken for the next one.
+        var staleConnect = false
         /// The short name this phone advertised, and its full name once read from its Name characteristic.
         var name: String?
         var fullName: String?
@@ -163,6 +171,23 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     private var pinnedId = 0
     private var book = SongTapNearbyBook()
     private var lastNearbyMs: Int64 = -1_000_000
+
+    /// How often the radio was started since `start`, and the name it runs with (a second start with the same role and name changes nothing).
+    private var radioStarts = 0
+    private var startedName = ""
+
+    /// Sender: the last tap that was ignored because there was no yes (or it was not the phone said yes to), for the log and the diagnostics hint.
+    private var ignoredTaps = 0
+    private var ignoredTapMs: Int64 = -1
+    private var ignoredTapNoYes = true
+    private var lastIgnoredLogMs: Int64 = -1_000_000
+
+    /// Names that were told no, and until when: a phone that comes back under a new address with the same name stays silenced.
+    private var ignoredNames: [String: Int64] = [:]
+
+    /// The prompt last shown, so the same named phone changing its address does not make it vanish and come back.
+    private var lastPrompt: SongTapNearbyEntry?
+    private var lastPromptMs: Int64 = -1
 
     // The sender's side. Three separate facts about who is talking to our GATT server, because a control write is only believed
     // from the phone it is about: `tapClient` wrote the tap message, `offerClient` read the offer, `ackClient` acknowledged it. An
@@ -234,8 +259,15 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
 
     /// "No" on the prompt: that phone is not asked about for a minute.
     public func ignorePrompt(_ peer: Int) {
-        book.ignore(peer, nowMs: clock.elapsedMs())
-        publishNearby(clock.elapsedMs(), force: true)
+        let t = clock.elapsedMs()
+        book.ignore(peer, nowMs: t)
+        // A phone that changes its address is still the same phone: every number it had, and any it takes later, stays silenced.
+        if let name = byId[peer]?.name {
+            ignoredNames[name] = t + SongTapNearbyBook.ignoreMs
+            for q in peers.values where q.role == .receive && q.name == name { book.ignore(q.id, nowMs: t) }
+        }
+        lastPrompt = nil
+        publishNearby(t, force: true)
     }
 
     /// The name of `peer` for a card: its full name when it gave one, else the short one it advertised.
@@ -272,11 +304,22 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         f.nearReported = f.detector.near
     }
 
+    private func roleWord(_ r: SongTapRole) -> String { r == .send ? "send" : "receive" }
+
     private func startLocked(_ newRole: SongTapRole) {
+        // Already running as this role, with this name: starting again would only stop and start the advertising for nothing
+        // (and a phone that restarts its advertising shows up under a new address every time).
+        if started && role == newRole && startedName == ownName && status == .active {
+            diag.log(clock.elapsedMs(), "radio already running (\(roleWord(newRole))), not restarted")
+            return
+        }
         if started { stopLocked() }
         role = newRole
         started = true
+        startedName = ownName
         signer = newRole == .send ? newSigner() : nil
+        radioStarts += 1
+        diag.log(clock.elapsedMs(), "advertising start (\(roleWord(newRole))), start number \(radioStarts)")
         let result = radio.start(role: newRole, listener: self, name: ownName)
         setStatus(result)
         if result != .active {
@@ -297,6 +340,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     }
 
     private func stopLocked() {
+        if started { diag.log(clock.elapsedMs(), "advertising stop (\(roleWord(role)))") }
         started = false
         ticking = false
         scheduler.stopTicking()
@@ -313,6 +357,9 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         ackClient = nil
         pinnedId = 0
         book.clear()
+        ignoredNames.removeAll()
+        lastPrompt = nil
+        clearIgnoredTap()
         setNearby([], nil)
         lastTapMs = -1
         lastPeerTapMs = -1
@@ -334,6 +381,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         tapClient = nil
         let first = pinnedId != peer
         pinnedId = peer
+        if peer != 0 { clearIgnoredTap() }
         if first, let target = byId[peer] { setFocus(target, clock.elapsedMs()) }
         diag.log(clock.elapsedMs(), offer == nil ? "offer does not fit one frame" : "offer ready for #\(peer) (\(payload.count) bytes)")
         // The phones already connected (they said Hello) are told there is something to read; others read when they connect.
@@ -409,7 +457,10 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     /// True when a phone other than `target` that advertises as a receiver is inside the near gate right now.
     private func anotherReceiverNear(_ target: Peer) -> Bool {
         let t = clock.elapsedMs()
+        let targetName = target.name
         for q in peers.values where q !== target && q.role == .receive {
+            // The same name is the same phone under another address (it changes every few seconds): never a second reader.
+            if let targetName, q.name == targetName { continue }
             if t - q.lastSeenMs <= SongTapBleTuning.peerTimeoutMs && q.detector.near { return true }
         }
         return false
@@ -558,6 +609,7 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
     private func connect(_ p: Peer, _ t: Int64) {
         p.conn = .connecting
         p.connectStartedMs = t
+        p.staleConnect = false
         radio.connect(address: p.address)
         diag.log(t, "connecting to #\(p.id)")
     }
@@ -572,6 +624,12 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         defer { drain() }
         let t = clock.elapsedMs()
         guard let p = peers[address], started else { radio.disconnect(address: address); return }
+        // An answer to an attempt that was already given up on (timeout): close it, it is not the connection being waited for.
+        if p.staleConnect && p.conn != .connecting {
+            p.staleConnect = false
+            if ok { radio.disconnect(address: address) }
+            return
+        }
         if !ok {
             p.conn = .closed
             p.nextConnectAtMs = t + SongTapBleTuning.reconnectMs
@@ -799,6 +857,17 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
             p.name = name
             if p.fullName == nil { emit(.peerName(peer: p.id, name: name)) }
         }
+        if role == .send && seenRole == .receive {
+            // A name that was told no stays told no under a new address (the silence lasts as long as it was given for).
+            if let n = p.name, let until = ignoredNames[n] {
+                if until > t {
+                    if !book.isIgnored(p.id, nowMs: t) { book.ignore(p.id, nowMs: until - SongTapNearbyBook.ignoreMs) }
+                } else {
+                    ignoredNames[n] = nil
+                }
+            }
+            if pinnedId != 0 && p.id != pinnedId { followSamePhone(p, t) }
+        }
 
         let impulse = impulseFor(p, own: ownImpulseMs)
         let wasHeld = p.detector.heldSinceMs >= 0
@@ -901,15 +970,21 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
 
     private func onFire(_ p: Peer, _ reason: SongTapFireReason, _ t: Int64) {
         // A sender armed to a phone has no business with a stranger's tap: it does not even follow it.
-        if pinnedId != 0 && p.id != pinnedId { return }
+        if pinnedId != 0 && p.id != pinnedId {
+            if role == .send && p.role == .receive { noteIgnoredTap(t, noYes: false) }
+            return
+        }
         if p !== focus { setFocus(p, t) }
         p.lastFire = reason
         p.lastFireMs = t
         diag.log(t, "tap detected (\(reason.code)) with #\(p.id)\(p.prefetched != nil ? ", offer already in hand" : "")")
         emit(.peerRole(peer: p.id, role: p.role))
         if role == .receive && p.role == .receive { return }
-        // The phone that is not the one the listener said yes to cannot start a beam (the session ignores it too).
-        if role == .send && p.id != pinnedId { return }
+        // The phone that is not the one the listener said yes to cannot start a beam (the session ignores it too): say so, never silently.
+        if role == .send && p.id != pinnedId {
+            if p.role == .receive { noteIgnoredTap(t, noYes: true) }
+            return
+        }
         // This phone already committed on the other phone's tap a moment ago: the session ignores a second tap, and nothing is sent back.
         let echo = lastPeerTapMs >= 0 && t - lastPeerTapMs < SongTapPeerTap.minGapMs
         lastTapMs = t
@@ -929,6 +1004,52 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
                 lastPeerTapNote = "own tap told to the receiver at \(t) ms"
             }
         }
+    }
+
+    /// A tap this phone felt but may not act on (the listener has not said yes): logged (at most every 2 s) and shown on the diagnostics screen.
+    private func noteIgnoredTap(_ t: Int64, noYes: Bool) {
+        ignoredTaps += 1
+        ignoredTapMs = t
+        ignoredTapNoYes = noYes
+        if t - lastIgnoredLogMs < SongTapBleTuning.tapIgnoredLogMs { return }
+        lastIgnoredLogMs = t
+        diag.log(t, noYes ? "tap ignored: no yes yet" : "tap ignored: not the phone you said yes to")
+    }
+
+    private func clearIgnoredTap() {
+        ignoredTaps = 0
+        ignoredTapMs = -1
+        ignoredTapNoYes = true
+        lastIgnoredLogMs = -1_000_000
+    }
+
+    /// Sender: the phone the listener said yes to has been silent for a moment and a phone with the same short name is being heard under
+    /// another address. It is the same phone (the address changes every few seconds), so it takes over the old one's number: the session,
+    /// the pin, the focus and the prompt carry on as if nothing happened, and the phones that are connected are told again there is an
+    /// offer. Two different names never merge.
+    private func followSamePhone(_ p: Peer, _ t: Int64) {
+        guard let old = byId[pinnedId] else { return }
+        if old === p || old.role != .receive || p.role != .receive { return }
+        guard let name = p.name, old.name == name else { return }
+        if t - old.lastSeenMs <= SongTapNearbyBook.samePhoneGapMs { return }
+        let temporary = p.id
+        peers[old.address] = nil
+        byId[old.id] = nil
+        byId[temporary] = nil
+        book.remove(old.id)
+        book.remove(temporary)
+        if old.conn != .closed { radio.disconnect(address: old.address) }
+        radio.forget(address: old.address)
+        p.id = old.id
+        byId[p.id] = p
+        p.detector.lastFireMs = max(p.detector.lastFireMs, old.detector.lastFireMs)
+        p.lastNearMs = max(p.lastNearMs, old.lastNearMs)
+        if focus === old {
+            focus = p
+            p.nearReported = old.nearReported
+        }
+        diag.log(t, "#\(p.id) changed its address (same name, \(name)), following the new one")
+        if offer != nil { for client in challenges.keys.sorted() { radio.notify(client: client, value: SongTapWire.encodeOfferReady()) } }
     }
 
     private func maybeConnect(_ p: Peer, _ t: Int64) {
@@ -966,9 +1087,10 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         for p in peers.values where p.conn == .connecting && t - p.connectStartedMs > SongTapBleTuning.connectTimeoutMs {
             radio.disconnect(address: p.address)
             p.conn = .closed
+            p.staleConnect = true
             p.writes.removeAll()
             p.nextConnectAtMs = t + SongTapBleTuning.reconnectMs
-            diag.log(t, "connection to #\(p.id) timed out")
+            diag.log(t, "connecting to #\(p.id) took too long, giving up for now")
             if p.inTransfer { failTransfer(p) }
         }
         if let f = focus {
@@ -1005,7 +1127,24 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
             return
         }
         let list = book.visible(role: .receive, nowMs: t)
-        setNearby(list, pinnedId != 0 ? nil : book.promptFor(role: .receive, nowMs: t))
+        setNearby(list, stickyPrompt(pinnedId != 0 ? nil : book.promptFor(role: .receive, nowMs: t), t))
+    }
+
+    /// The prompt, kept up for a moment while the phone it is about changes its address: the old row goes stale and the new one is not
+    /// inside the gate yet, but the question is still about the same named phone, so it neither vanishes nor comes back.
+    private func stickyPrompt(_ next: SongTapNearbyEntry?, _ t: Int64) -> SongTapNearbyEntry? {
+        if let next {
+            lastPrompt = next
+            lastPromptMs = t
+            return next
+        }
+        guard let last = lastPrompt else { return nil }
+        if pinnedId != 0 || t - lastPromptMs > SongTapBleTuning.promptGraceMs {
+            lastPrompt = nil
+            return nil
+        }
+        for e in book.visible(role: .receive, nowMs: t) where e.name == last.name && !book.isIgnored(e.id, nowMs: t) { return e }
+        return nil
     }
 
     private func setNearby(_ list: [SongTapNearbyEntry], _ ask: SongTapNearbyEntry?) {
@@ -1071,6 +1210,12 @@ public final class SongTapBleRoute: SongTapTransport, SongTapBleRadioListener {
         s.offerInHand = f?.prefetched != nil
         s.names = f == nil ? "" : "\(f!.name ?? "-") / \(f!.fullName ?? "-")"
         s.peerTap = lastPeerTapNote
+        if ignoredTaps > 0 {
+            let what = ignoredTapNoYes ? "tap ignored: no yes yet" : "tap ignored: not the phone you said yes to"
+            s.tapNote = "\(what) (\(ignoredTaps)x, last \(t - ignoredTapMs) ms ago)"
+        }
+        s.needsYes = role == .send && pinnedId == 0 && ignoredTaps > 0 && ignoredTapNoYes && t - ignoredTapMs < SongTapBleTuning.needsYesHintMs
+        s.radioStarts = radioStarts
         return s
     }
 
