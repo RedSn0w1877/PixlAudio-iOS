@@ -5,14 +5,14 @@ import SwiftUI
 
 // The views of the search history (the rules are `SearchHistoryRules`, the state is `SearchModel`; the Android twin is
 // `SearchHistoryList` in `SearchScreen.kt`):
-// - `SearchRecentStrip`: one horizontal row of up to 10 tiles above the genre grid while the field is not focused;
+// - `SearchRecentStrip`: "Recent" with up to 3 rows above Browse while the field is not focused (redesign 2);
 // - `SearchRecentList`: the vertical "Recent searches" list that takes the grid's place while the field is focused and
-//   blank (query rows with a clock, an arrow that fills the field without searching, an X; result rows with artwork);
+//   blank (the same rows; typed searches add an arrow that fills the field without searching);
 // - `SearchSuggestionList`: the rows that match what is typed, above the live results (max 5);
 // - `SearchPrivateHint`: the one line shown instead of all of it during a private session;
 // - `SearchUndoBar`: the bar that follows a removal or Clear all.
-// Liquid Glass: the rows of a list sit on ONE glass shape (never a glass layer per row); only the small X is a glass
-// circle (`GlassCircleButton`). The strip is plain fills (it scrolls sideways under the grid's glass cards).
+// Liquid Glass: the suggestion rows sit on ONE glass shape (never a glass layer per row); the Recent rows (redesign 2)
+// have no card behind, as on Android.
 
 nonisolated enum SearchHistoryStrings {
     static var recent: String { String(localized: "Recent") }
@@ -24,6 +24,8 @@ nonisolated enum SearchHistoryStrings {
     static var cleared: String { String(localized: "Recent searches cleared") }
     static var privateHint: String { String(localized: "Private session: searches aren't saved.") }
     static var recentSearchTrait: String { String(localized: "Recent search") }
+    /// The kind line of a typed search's row (Android `search_history_kind_query`).
+    static var searched: String { String(localized: "Searched") }
     static func undoAnnouncement(_ message: String) -> String { String(localized: "\(message). Undo is available.") }
     static func fill(_ query: String) -> String { String(localized: "Use \(query) in the search field") }
     static func removeLabel(_ query: String) -> String { String(localized: "Remove \(query) from recent searches") }
@@ -178,8 +180,103 @@ private struct HistoryRowsContainer<Content: View>: View {
     }
 }
 
+// MARK: - Redesign 2: the Recent row
+
+/// One Recent row (redesign 2, Android `RecentRow`, mockup AndroidSearch): 56 pt min; 48 pt art — a song in the
+/// Cookie9 shape, an artist a circle, an album or playlist a 16 pt square, a typed search a 16 pt
+/// `surfaceContainerHigh` tile with the history symbol — 14 pt, the title 16/22 (a typed search in quotes) over its
+/// kind 13/18 ("Song", "Artist", "Searched"…), then (the focused list only, typed searches) the fill arrow and a 44 pt
+/// X. A tap opens it; the X, a long press or the accessibility action removes it. No card behind (plain rows).
+private struct SearchRecentRow: View {
+    let item: SearchHistoryItem
+    let onOpen: () -> Void
+    let onRemove: () -> Void
+    var onFill: (() -> Void)?
+
+    @Environment(\.appTheme) private var theme
+
+    private static let artSize: CGFloat = 48
+
+    var body: some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 14) {
+                art
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.isResult ? item.shownTitle : "\u{201C}\(item.query)\u{201D}")
+                        .pixlFont(.custom(size: 16, lineHeight: 22))
+                        .foregroundStyle(theme.onSurface)
+                        .lineLimit(1)
+                    Text(SearchHistoryStrings.kind(item.openKind) ?? SearchHistoryStrings.searched)
+                        .pixlFont(.redesignRowSubtitle)
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .contentShape(.rect(cornerRadius: 16))
+            .onTapGesture(perform: onOpen)
+            .onLongPressGesture(minimumDuration: 0.45) { onRemove() }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default, onOpen)
+            .accessibilityAction(named: Text(SearchHistoryStrings.remove), onRemove)
+            .accessibilityIdentifier("search.recentTile")
+
+            if let onFill, !item.isResult {
+                Button(action: onFill) {
+                    Image(systemName: "arrow.up.left")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.onSurfaceVariant)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(theme.surfaceContainerHighest))
+                        .frame(width: 40, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(PressScaleButtonStyle())
+                .accessibilityLabel(SearchHistoryStrings.fill(item.query))
+                .accessibilityIdentifier("search.history.fill")
+            }
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PressScaleButtonStyle())
+            .accessibilityLabel(SearchHistoryStrings.removeLabel(item.shownTitle))
+            .accessibilityIdentifier("search.history.remove")
+        }
+        .frame(minHeight: 56)
+    }
+
+    @ViewBuilder
+    private var art: some View {
+        let size = Self.artSize
+        switch item.openKind {
+        case nil, .query?:
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(theme.onSurfaceVariant)
+                .frame(width: size, height: size)
+                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(theme.surfaceContainerHigh))
+                .accessibilityHidden(true)
+        case .artist?:
+            ArtworkView(source: ArtworkSource(uriString: item.imageUrl), size: size, cornerRadius: size / 2)
+        case .song?:
+            ArtworkView(source: ArtworkSource(uriString: item.imageUrl), size: size, cornerRadius: 0)
+                .clipShape(ExpressiveBadgeShape(.cookie9))
+        case .album?, .playlist?:
+            ArtworkView(source: ArtworkSource(uriString: item.imageUrl), size: size, cornerRadius: 16)
+        }
+    }
+}
+
 // MARK: - Focused and blank: the vertical list
 
+/// The list that takes the Browse page's place while the blank field has focus (Android `SearchHistoryPanel`):
+/// "Recent searches" 14/20 medium `onSurfaceVariant` with Clear all (asks nothing: the page offers Undo), then every
+/// row, 4 pt apart, 16 pt sides, without a card behind.
 struct SearchRecentList: View {
     let items: [SearchHistoryItem]
     let onOpen: (SearchHistoryItem) -> Void
@@ -190,45 +287,40 @@ struct SearchRecentList: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(SearchHistoryStrings.recentSearches)
-                        .pixlFont(.titleLarge, weight: .semibold)
-                        .foregroundStyle(theme.onSurface)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer(minLength: 8)
-                    Button(action: onClearAll) {
-                        Text(SearchHistoryStrings.clearAll)
-                            .pixlFont(.labelLarge, weight: .bold)
-                            .foregroundStyle(theme.primary)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 44)
-                            .contentShape(.rect)
-                    }
-                    .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
-                    .accessibilityIdentifier("search.history.clearAll")
+        VStack(spacing: 0) {
+            HStack {
+                Text(SearchHistoryStrings.recentSearches)
+                    .pixlFont(.redesignLabel)
+                    .foregroundStyle(theme.onSurfaceVariant)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                Button(action: onClearAll) {
+                    Text(SearchHistoryStrings.clearAll)
+                        .pixlFont(.labelLarge)
+                        .foregroundStyle(theme.primary)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
                 }
-                .padding(.leading, 6)
-                HistoryRowsContainer {
-                    ForEach(items, id: \.key) { item in
-                        SearchHistoryRow(item: item, onOpen: { onOpen(item) }, onFill: { onFill(item) },
-                                         onRemove: { onRemove(item) })
-                            .contextMenu {
-                                Button(role: .destructive) { onRemove(item) } label: {
-                                    Label(SearchHistoryStrings.remove, systemImage: "xmark")
-                                }
-                            }
-                    }
-                }
+                .buttonStyle(PressScaleButtonStyle(pressedScale: 0.96))
+                .accessibilityIdentifier("search.history.clearAll")
             }
-            .padding(.top, 14)
-            .padding(.bottom, 28)
+            .padding(.leading, 16)
+            .padding(.trailing, 8)
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(items, id: \.key) { item in
+                        SearchRecentRow(item: item, onOpen: { onOpen(item) }, onRemove: { onRemove(item) },
+                                        onFill: { onFill(item) })
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 28)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.never)
         }
-        .scrollIndicators(.hidden)
-        .scrollDismissesKeyboard(.never)
-        .padding(.horizontal, 18)
-        .clipShape(TopRoundedClip(radius: 24))
         .accessibilityIdentifier("search.recentList")
     }
 }
@@ -254,86 +346,33 @@ struct SearchSuggestionList: View {
     }
 }
 
-// MARK: - Not focused: the strip above the grid
+// MARK: - Not focused: "Recent" above Browse
 
+/// "Recent" above Browse (redesign 2, Android `SearchRecentStrip`, mockup AndroidSearch): a 14/20 medium label in
+/// `onSurfaceVariant`, 6 pt, then up to `rowsShown` rows 4 pt apart, 16 pt sides. The full list is the focused field's.
 struct SearchRecentStrip: View {
     let items: [SearchHistoryItem]
     let onOpen: (SearchHistoryItem) -> Void
     let onRemove: (SearchHistoryItem) -> Void
 
+    /// Rows shown under "Recent" (Android `RecentRowsShown`).
+    static let rowsShown = 3
+
     @Environment(\.appTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(SearchHistoryStrings.recent)
-                .pixlFont(.titleLarge, weight: .semibold)
-                .foregroundStyle(theme.onSurface)
+                .pixlFont(.redesignLabel)
+                .foregroundStyle(theme.onSurfaceVariant)
                 .accessibilityAddTraits(.isHeader)
-                .padding(.leading, 6)
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: 12) {
-                    ForEach(items, id: \.key) { item in
-                        SearchRecentTile(item: item, onOpen: { onOpen(item) }, onRemove: { onRemove(item) })
-                            .contextMenu {
-                                Button(role: .destructive) { onRemove(item) } label: {
-                                    Label(SearchHistoryStrings.remove, systemImage: "xmark")
-                                }
-                            }
-                    }
-                }
-                .padding(.horizontal, 2)
+                .padding(.bottom, 6)
+            ForEach(items.prefix(Self.rowsShown), id: \.key) { item in
+                SearchRecentRow(item: item, onOpen: { onOpen(item) }, onRemove: { onRemove(item) })
             }
-            .scrollIndicators(.hidden)
         }
-        .padding(.bottom, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier("search.recentStrip")
-    }
-}
-
-private struct SearchRecentTile: View {
-    let item: SearchHistoryItem
-    let onOpen: () -> Void
-    let onRemove: () -> Void
-    @Environment(\.appTheme) private var theme
-
-    private static let artSize: CGFloat = 64
-
-    var body: some View {
-        Button(action: onOpen) {
-            if item.isResult {
-                VStack(spacing: 6) {
-                    HistoryLeading(item: item, size: Self.artSize)
-                    Text(item.shownTitle)
-                        .pixlFont(.bodySmall)
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                        .frame(width: Self.artSize + 8)
-                }
-            } else {
-                // A typed search: a chip, centred on the art row's height.
-                HStack(spacing: 6) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(theme.onSurfaceVariant)
-                    Text(item.query)
-                        .pixlFont(.labelLarge)
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                        .frame(maxWidth: 160, alignment: .leading)
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 40)
-                .background(Capsule().fill(theme.surfaceContainerHigh.opacity(0.85)))
-                .padding(.top, (Self.artSize - 40) / 2)
-            }
-        }
-        .buttonStyle(PressScaleButtonStyle(pressedScale: 0.94))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel([item.shownTitle, SearchHistoryStrings.kind(item.kind), SearchHistoryStrings.recentSearchTrait]
-            .compactMap { $0 }.joined(separator: ", "))
-        // The long-press menu is not reachable with VoiceOver: removal is also an action on the tile.
-        .accessibilityAction(named: Text(SearchHistoryStrings.remove), onRemove)
-        .accessibilityIdentifier("search.recentTile")
     }
 }
 

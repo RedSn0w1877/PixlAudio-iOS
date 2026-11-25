@@ -5,16 +5,16 @@ import PixlModel
 import SwiftUI
 
 /// Search — the port of PixlAudio's `SearchScreen.kt` (default, non-glass-mode layout):
-/// - top: the large "Search" title with the settings button (40 pt, `primaryContainer` glass circle). The search
+/// - top (redesign 2): "Search" 36/44 (28/36 with results) with the settings square (48 pt neutral glass). The search
 ///   field itself moved into the bottom bar (split pill, new UI 2026-11-16): on this tab the bar's big capsule is the
 ///   field (`GlassNavBar`), bound to `Router.searchText`; its search key bumps `Router.searchSubmission`;
 /// - empty query, field not focused: the browse grid (catalogue categories + library genres, `GenreBrowseView`) under a
 ///   "Recent" strip when there is history;
 /// - empty query, field focused: the "Recent searches" list in the grid's place (`SearchRecentList`);
 /// - during a private session nothing of the history shows (one line says searches aren't saved) and nothing is saved;
-/// - otherwise (16 pt sides): the filter chips (All / Songs / Albums / Artists / Playlists) as glass capsules, then
-///   the results grouped Songs, Albums, Artists, Playlists, "More on Spotify", "From YouTube Music" (top corners
-///   clipped at 28 pt), or the empty state;
+/// - otherwise (16 pt sides): the filter as one connected glass group (All / Songs / Artists / Albums / Playlists),
+///   the "Top result" card on All, then the results grouped Songs, Albums, Artists, Playlists, "More on Spotify",
+///   "From YouTube Music" (top corners clipped at 28 pt), or the empty state;
 /// - the bottom scrim (transparent → `surfaceContainerLowest`) behind the mini player and bar.
 /// Library results come from `LibrarySearchProvider` (SearchIndex); the catalogue and YouTube Music from the
 /// providers stages 12/11 plug into `SearchProviding` (demo providers in UI tests).
@@ -42,10 +42,11 @@ struct SearchView: View {
         let mode: Mode = !isBlank ? .results
             : (router.isSearchFieldFocused && !hidesHistory && !model.history.isEmpty ? .recents : .browse)
         VStack(spacing: 0) {
-            topRow
+            topRow(compact: mode == .results)
             ZStack(alignment: .top) {
                 switch mode {
                 case .browse:
+                    // 20 pt under the title (the grid adds its own 8).
                     genreBrowse(hidesHistory: hidesHistory)
                         .padding(.top, 12)
                         .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: -56)),
@@ -118,17 +119,23 @@ struct SearchView: View {
 
     // MARK: Top row
 
-    /// The page title and the settings circle (as Library's header). The field is the bottom bar's big capsule on
-    /// this tab (`GlassNavBar`).
-    private var topRow: some View {
-        LargeHeader("Search") {
-            GlassCircleButton(systemImage: "gearshape", accessibilityLabel: "Settings",
-                              tint: theme.primaryContainer.opacity(GlassTint.container),
-                              foreground: theme.onPrimaryContainer) {
+    /// Redesign 2 (Android, mockups AndroidSearch / AndroidSearchResults): "Search" 36/44 bold on Browse and the
+    /// recents, 28/36 once results show, with Settings as a 48 pt neutral square; 16 pt gutter, 12 pt under the status
+    /// bar. The field is the bottom bar's big capsule on this tab (`GlassNavBar`).
+    private func topRow(compact: Bool) -> some View {
+        HStack(spacing: 8) {
+            RedesignScreenTitle("Search", style: compact
+                ? .custom(size: 28, weight: .bold, lineHeight: 36, tracking: -0.3) : .redesignScreenTitle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.easeOut(duration: 0.2), value: compact)
+            RedesignHeaderButton(systemImage: "gearshape", accessibilityLabel: "Settings") {
                 router.push(.settings)
             }
             .accessibilityIdentifier("search.settings")
         }
+        .frame(height: Redesign.headerButtonSize)
+        .padding(.horizontal, Redesign.gutter)
+        .padding(.top, 12)
     }
 
     // MARK: Browse
@@ -158,6 +165,7 @@ struct SearchView: View {
             SearchPrivateHint()
         } else if !model.strip.isEmpty {
             SearchRecentStrip(items: model.strip, onOpen: openRecent, onRemove: { model.remove($0) })
+                .padding(.bottom, 6)
         }
     }
 
@@ -218,8 +226,7 @@ struct SearchView: View {
         let state = resultsState
         return VStack(spacing: 0) {
             SearchFilterChips(selection: $model.filter)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 8)
+                .padding(.vertical, 14)
             // One scroll view for every state: the matching history rows sit at its top and stay put while the loading,
             // empty and results states swap underneath them (they used to be rebuilt, and faded, with each swap).
             ScrollView {
@@ -238,11 +245,15 @@ struct SearchView: View {
                         SearchingResultsView()
                             .transition(.opacity)
                     case .list:
+                        if model.filter == .all, let top = topResult {
+                            SearchTopResultCard(song: top) { playSong(top) }
+                                .padding(.bottom, 14)
+                                .transition(.opacity)
+                        }
                         resultSections
                             .transition(.opacity)
                     }
                 }
-                .padding(.top, 8)
                 .padding(.bottom, 24)
                 .animation(.easeInOut(duration: 0.19), value: state)
             }
@@ -260,6 +271,16 @@ struct SearchView: View {
         router.searchText = item.query
         model.record(item.query)
         router.requestSearchBlur()
+    }
+
+    /// The first song of the results, as the big "Top result" card (redesign 2; the All filter only).
+    private var topResult: Song? {
+        for section in model.sections {
+            for row in section.rows {
+                if case .song(let song) = row.item { return song }
+            }
+        }
+        return nil
     }
 
     private var resultSections: some View {

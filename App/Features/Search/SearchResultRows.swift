@@ -13,12 +13,12 @@ struct SearchResultSectionHeader: View {
     @Environment(\.appTheme) private var theme
 
     var body: some View {
+        // Redesign 2: 18/22 bold, 8 pt above and below.
         Text(title)
-            .pixlFont(.titleMedium, weight: .bold)
+            .pixlFont(.redesignSectionTitle)
             .foregroundStyle(theme.onSurface)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)
-            .padding(.horizontal, 4)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -445,5 +445,54 @@ nonisolated enum SearchFormat {
     /// "1 song", else "N songs" (Android's `formatSongCount` said "0 Song").
     static func songCount(_ count: Int) -> String {
         count == 1 ? "1 song" : "\(count) songs"
+    }
+}
+
+/// "Top result" (redesign 2, Android `SearchTopResultCard`, mockup AndroidSearchResults): a `tertiaryContainer` glass
+/// card, 28 pt corners, 14 pt padding; 88 pt art with 20 pt corners, 14 pt, "Top result" 12/16 medium, the title 26/32
+/// bold, the artist 14/20, "Song" 13/18 6 pt below; a 64 pt Cookie9 play button (`onTertiaryContainer` fill,
+/// `tertiaryContainer` glyph). The whole card plays the song with the result queue (same handler as its row).
+struct SearchTopResultCard: View {
+    let song: Song
+    let onPlay: () -> Void
+
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        Button(action: onPlay) {
+            HStack(spacing: 14) {
+                ArtworkView(song: song, size: 88, cornerRadius: 20)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Top result")
+                        .pixlFont(.custom(size: 12, weight: .medium, lineHeight: 16, tracking: 0.4))
+                    Text(song.title)
+                        .pixlFont(.custom(size: 26, weight: .bold, lineHeight: 32, tracking: -0.3))
+                        .lineLimit(1)
+                    Text(song.displayArtist)
+                        .pixlFont(.custom(size: 14, lineHeight: 20))
+                        .lineLimit(1)
+                    Text("Song")
+                        .pixlFont(.redesignRowSubtitle)
+                        .padding(.top, 6)
+                }
+                .foregroundStyle(theme.onTertiaryContainer)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "play.fill")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(theme.tertiaryContainer)
+                    .frame(width: 64, height: 64)
+                    .background(ExpressiveBadgeShape(.cookie9).fill(theme.onTertiaryContainer))
+                    .accessibilityHidden(true)
+            }
+            .padding(14)
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .pixlGlass(in: shape, tint: theme.tertiaryContainer.opacity(GlassTint.container), interactive: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Top result, \(song.title), \(song.displayArtist)")
+        .accessibilityHint("Plays the song")
+        .accessibilityIdentifier("search.topResult")
     }
 }
