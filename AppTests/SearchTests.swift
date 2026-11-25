@@ -181,6 +181,7 @@ final class SearchTests: XCTestCase {
 
     func testSearchLaunchOptionsDefaultToAll() {
         XCTAssertEqual(SearchLaunchOptions.initialFilter, .all)
-        XCTAssertEqual(SearchFilterChips.filters, [.all, .songs, .albums, .artists, .playlists])
+        // Redesign 2: Android `SearchFilterGroupOrder`.
+        XCTAssertEqual(SearchFilterChips.filters, [.all, .songs, .artists, .albums, .playlists])
     }
 }

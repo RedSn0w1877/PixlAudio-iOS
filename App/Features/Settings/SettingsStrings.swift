@@ -642,6 +642,9 @@ nonisolated enum L10n {
     static let settingsGainModeTrack = String(localized: "settings_gain_mode_track", defaultValue: "Track")
     static let settingsGlobalThemeSection = String(localized: "settings_global_theme_section", defaultValue: "Global Theme")
     static let settingsGroupAdvanced = String(localized: "settings_group_advanced", defaultValue: "Advanced")
+    /// Redesign 2: the main list's two groups (Android `settings_group_listening` / `settings_group_app`).
+    static let settingsGroupListening = String(localized: "settings_group_listening", defaultValue: "Listening")
+    static let settingsGroupApp = String(localized: "settings_group_app", defaultValue: "App")
     static let settingsGroupLookAndFeel = String(localized: "settings_group_look_and_feel", defaultValue: "Look & feel")
     static let settingsGroupMusic = String(localized: "settings_group_music", defaultValue: "Music")
     static let settingsGroupServices = String(localized: "settings_group_services", defaultValue: "Services")

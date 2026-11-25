@@ -25,11 +25,11 @@ Beta 2: `pp_*.png`; current Library › Songs: `owner-library-songs-2026-09-30.p
 | `TopAppBar` with large title + actions | Same title in SF Pro + glass action circles | `LargeHeader` |
 | Section title + subtitle (+ refresh button) | Same text styles, optional glass circle | `SectionHeader` |
 | Bottom `NavigationBar` (custom compact bar, 3 icons) | **New UI 2026-11-16:** the split pill — a big see-through glass capsule (Home + Library, gliding tonal selection) and a glass circle (Search); on Search they flip into a Home circle and the search field (see Shell › Split-pill bar). Earlier: the liquid-lens capsule (2026-10-02) | `GlassNavBar` |
-| Mini player (player sheet, collapsed) | **New UI 2026-11-16:** a see-through glass pill floating 12 pt above the split-pill bar, lightly tinted with the album's `primaryContainer` (`GlassTint.miniPlayer`); the progress is a thin ring round the play / pause circle (see Now playing and mini player (new UI stage 3)). Earlier: glass bar tinted at `container` | `MiniPlayerBar` |
+| Mini player (player sheet, collapsed) | **New UI 2026-11-16:** a see-through glass pill floating 12 pt above the split-pill bar, lightly tinted with the album's `primaryContainer` (`GlassTint.miniPlayer`); **redesign 2 (2026-11-25):** the progress is a 3 pt line near the pill's bottom (the ring round play / pause is gone; see Redesign batch 2). Earlier: glass bar tinted at `container` | `MiniPlayerBar` |
 | `ModalBottomSheet` | System sheet (glass by itself) + PixlAudio's sheet layout inside | `SheetScaffold` + `.pixlSheet()` |
 | Ripple, state layers | Glass `.interactive()` highlight; `PressScaleButtonStyle` for fills sitting on glass | `GlassStyle.swift` |
 | Tonal elevation, shadows | None (glass depth) | — |
-| Material shapes (cookie / squircle morphs), Material motion | Rounded/continuous shapes, interruptible springs | `PixlMotion` |
+| Material shapes (cookie / squircle morphs), Material motion | Rounded/continuous shapes, interruptible springs; **redesign 2:** the `MaterialShapes` badges behind icons and covers (Cookie9, Sunny, Flower, Clover4, SoftBurst, Cookie6) are drawn as the same outlines (`ExpressiveBadgeShape`, fills, never glass) | `PixlMotion`, `RedesignKit` |
 | Material You dynamic colour (wallpaper) | PixlAudio's brand scheme (`ArtworkTheme.brandPair`, from `0xFF6C4FF5`) — iOS has no wallpaper colours | `ThemeColors.brand` |
 | Album-art colour scheme (`ColorSchemeProcessor`) | Same algorithm, ported bit-exact (`PixlLibrary/ArtworkTheme`) | `ThemeStore`, `ColorExtractor` |
 
@@ -1426,3 +1426,24 @@ Material, glass where Android would fill a surface).
   reaches the rows at whole percents (`CloudTransfers.onProgress`); worker progress only from `/status` every ≥ 15 s
   while jobs are at RunPod; no timer runs while nothing is in flight; hashing, decoding and file checks are detached
   or `@concurrent`.
+
+## Redesign batch 2 (2026-11-25, branch `redesign-2`)
+
+Android's redesign batch 2 (`handoff/2026-11-25-redesign-2.md` in the Android repo, mockups `project/Android*.dc.html`)
+ported to Library, Search, Queue, Ask Taizo, Settings and the mini player. The values are Android's; the shared pieces
+live in `DesignSystem/Components/RedesignKit.swift`, the port of `RedesignKit.kt`.
+
+- **Glass mapping of the kit:** a filled header square, chip, connected-group segment, grouped row, card or pill is one
+  glass shape tinted with Android's fill role (`prominent` for `primary*` / `secondaryContainer` accents, `container` for
+  `tertiaryContainer` cards, `surface` for `surfaceContainer*`); an unselected outlined chip is clear glass with a 1 pt
+  `outline` border. Controls sitting on those shapes (toolbar buttons on the queue pill, the queue card's play square,
+  the mini player's transport, Taizo's send circle, shape badges) are fills. Groups and chip rows share a
+  `GlassEffectContainer` whose spacing is below their gap.
+- **Expressive shapes:** `ExpressiveBadgeShape` draws `MaterialShapes`' badges as polar outlines (lobes × valley depth ×
+  sharpness), sampled once per kind into a unit path and scaled per rect; no trigonometry per frame.
+- **Type:** SF Pro at Android's sizes (`PixlTextStyle.redesignScreenTitle` 36/44 bold −0.5, `redesignCompactTitle`
+  28/34 bold −0.3, row 16/22 medium, subtitle 13/18, label 14/20 medium, section 18/22 bold).
+- **Mini player:** Android's layout (48 pt Cookie9 cover, bare previous / next, 48 pt `primary` play / pause whose
+  corners spring 16 pt ↔ round) and the owner's thin progress line (3 pt, 24 pt in, 5 pt up, track `onPrimaryContainer`
+  16 %). `MiniPlayerProgressLine` samples the clock on a `TimelineView` only while playing and on screen, about once per
+  point the line's end moves; only it redraws.

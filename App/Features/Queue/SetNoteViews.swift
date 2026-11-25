@@ -72,7 +72,7 @@ struct SetNoteRowLabel: View {
             .foregroundStyle(theme.onSurfaceVariant)
             .lineLimit(2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 4) // inside the queue list's 16 pt gutter (redesign 2)
             .padding(.vertical, 2)
             .accessibilityIdentifier("queue.setNote")
     }

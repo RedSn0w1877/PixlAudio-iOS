@@ -153,14 +153,15 @@ struct LibraryAlbumsPage: View {
                             ForEach(albums) { album in item(album, list: true) }
                         }
                     } else {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
-                                  spacing: 8) {
+                        // Redesign 2 (AndroidLibrary grid): 2 columns, 12 pt across, 16 pt down, 16 pt gutter.
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                                  spacing: 16) {
                             ForEach(albums) { album in item(album, list: false) }
                         }
                     }
                 }
-                .padding(.leading, 14)
-                .padding(.trailing, showsScrollbarGap ? 24 : 14)
+                .padding(.leading, isListView ? 14 : Redesign.gutter)
+                .padding(.trailing, showsScrollbarGap ? 24 : (isListView ? 14 : Redesign.gutter))
                 .padding(.bottom, libraryListExtraBottomGap + 4)
             }
             .scrollIndicators(showsScrollbarGap ? .visible : .hidden)
@@ -197,49 +198,53 @@ struct AlbumCard: View {
     var isSelected = false
     var selectionIndex: Int?
 
+    @Environment(\.appTheme) private var theme
+
     var body: some View {
-        AlbumSchemeReader(artUri: album.albumArtUriString) { scheme in
-            if isList { listCard(scheme) } else { gridCard(scheme) }
+        if isList {
+            AlbumSchemeReader(artUri: album.albumArtUriString) { scheme in listCard(scheme) }
+                .scaleEffect(isSelected ? 0.99 : 1)
+                .animation(.easeOut(duration: 0.22), value: isSelected)
+        } else {
+            gridCard
         }
-        .scaleEffect(isSelected ? (isList ? 0.99 : 0.985) : 1)
-        .animation(.easeOut(duration: 0.22), value: isSelected)
     }
 
-    private func gridCard(_ scheme: ThemeColors) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
-        return VStack(alignment: .leading, spacing: 0) {
+    /// Redesign 2 (Android `AlbumGridItemRedesigned`, mockup AndroidLibrary): square art with 28 pt corners on
+    /// `surfaceContainerHigh`, 8 pt, the title 16/22 medium and "artist · N songs" 13/18 `onSurfaceVariant`, 2 pt in.
+    /// No per-album palette card any more (no colour extraction per tile). Selected: the art scales to 0.94 with a
+    /// 2 pt `primary` border and the numbered 28 pt badge.
+    private var gridCard: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        return VStack(alignment: .leading, spacing: 8) {
             Color.clear
-                .aspectRatio(3.0 / 2.0, contentMode: .fit)
+                .aspectRatio(1, contentMode: .fit)
                 .overlay {
                     GeometryReader { proxy in
                         ArtworkView(source: ArtworkSource(uriString: album.albumArtUriString),
                                     size: proxy.size.width, cornerRadius: 0)
                             .frame(width: proxy.size.width, height: proxy.size.height)
-                            .clipped()
                     }
-                    .mask(LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom))
                 }
+                .background(theme.surfaceContainerHigh)
+                .clipShape(shape)
+                .overlay { if isSelected { shape.strokeBorder(theme.primary, lineWidth: 2) } }
+                .overlay(alignment: .topTrailing) { badge(theme, size: 28).padding(10) }
+                .scaleEffect(isSelected ? 0.94 : 1)
+                .animation(.easeOut(duration: 0.22), value: isSelected)
             VStack(alignment: .leading, spacing: 0) {
                 Text(album.title)
-                    .pixlFont(.titleMedium, weight: .bold)
-                    .foregroundStyle(scheme.onPrimaryContainer)
+                    .pixlFont(.redesignRowTitle)
+                    .foregroundStyle(theme.onSurface)
                     .lineLimit(1)
-                Text(album.artist)
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(scheme.onPrimaryContainer.opacity(0.85))
-                    .lineLimit(1)
-                Text(LibraryFormat.songCount(album.songCount))
-                    .pixlFont(.bodySmall)
-                    .foregroundStyle(scheme.onPrimaryContainer.opacity(0.7))
+                Text("\(album.artist) · \(LibraryFormat.songCount(album.songCount))")
+                    .pixlFont(.redesignRowSubtitle)
+                    .foregroundStyle(theme.onSurfaceVariant)
                     .lineLimit(1)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: 84, alignment: .leading)
+            .padding(.horizontal, 2)
         }
-        .clipShape(shape)
-        .pixlGlass(in: shape, tint: scheme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
-        .overlay { if isSelected { shape.stroke(scheme.primary, lineWidth: 2) } }
-        .overlay(alignment: .topTrailing) { badge(scheme, size: 28).padding(10) }
+        .contentShape(.rect(cornerRadius: 16))
     }
 
     private func listCard(_ scheme: ThemeColors) -> some View {

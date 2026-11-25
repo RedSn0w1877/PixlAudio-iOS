@@ -21,21 +21,22 @@ struct GenreBrowseView<Header: View>: View {
     @Environment(\.appTheme) private var theme
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 12), count: isGridView ? 2 : 1)
+        // Redesign 2: 10 pt gaps.
+        Array(repeating: GridItem(.flexible(), spacing: 10), count: isGridView ? 2 : 1)
     }
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
+            LazyVStack(alignment: .leading, spacing: 10) {
                 header
-                Text("Browse categories")
-                    .pixlFont(.titleLarge, weight: .semibold)
+                // Redesign 2: "Browse" 22/28 medium (20 pt under the Recent rows).
+                Text("Browse")
+                    .pixlFont(.custom(size: 22, weight: .medium, lineHeight: 28))
                     .foregroundStyle(theme.onSurface)
                     .accessibilityAddTraits(.isHeader)
-                    .padding(.leading, 6)
-                    .padding(.top, 6)
-                    .padding(.bottom, 10)
-                LazyVGrid(columns: columns, spacing: 12) {
+                    .padding(.top, 4)
+                    .padding(.bottom, 2)
+                LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(categories) { category in
                         SearchCategoryCard(category: category) { onCategory(category) }
                     }
@@ -48,7 +49,7 @@ struct GenreBrowseView<Header: View>: View {
                         .padding(.top, 24)
                 } else {
                     genresHeader
-                    LazyVGrid(columns: columns, spacing: 12) {
+                    LazyVGrid(columns: columns, spacing: 10) {
                         ForEach(genres) { genre in
                             GenreCard(genre: genre, isGridView: isGridView) { onGenre(genre) }
                         }
@@ -60,7 +61,7 @@ struct GenreBrowseView<Header: View>: View {
         }
         .scrollIndicators(.hidden)
         .minimizesTabBarOnScroll()
-        .padding(.horizontal, 18)
+        .padding(.horizontal, Redesign.gutter)
         .clipShape(TopRoundedClip(radius: 24))
         .accessibilityIdentifier("search.genreGrid")
     }
@@ -68,7 +69,7 @@ struct GenreBrowseView<Header: View>: View {
     private var genresHeader: some View {
         HStack {
             Text("Browse by genre")
-                .pixlFont(.titleLarge)
+                .pixlFont(.custom(size: 22, weight: .medium, lineHeight: 28))
                 .foregroundStyle(theme.onSurface)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
@@ -94,35 +95,39 @@ struct GenreBrowseView<Header: View>: View {
     }
 }
 
-/// Android `SearchCategoryCard`: 1.45 : 1, 24 pt corners, the category's genre colour, its glyph rotated −14°
-/// at 32 % out of the bottom-trailing corner, the name (20 pt bold, two lines, 78 % wide) top-leading.
+/// Android `SearchCategoryCard` (redesign 2, mockup AndroidSearch "Browse"): a 96 pt tile, 24 pt corners, the
+/// category's genre colour (tinted glass), the name 18 pt bold (two lines, 78 % wide) at 16 / 14 pt, and an 84 pt
+/// expressive shape poking out of the bottom-trailing corner (16 pt past the side, 18 pt past the bottom) in
+/// lerp(container, onContainer, 0.45). The shape is picked by the id's Java hash, as on Android.
 struct SearchCategoryCard: View {
     let category: SearchCategory
     let action: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
 
+    private static let badgeShapes: [BadgeShapeKind] = [.flower, .clover4, .sunny, .softBurst, .cookie6, .cookie9]
+
     var body: some View {
         let colors = GenreCardPalette.color(genreId: category.id, isDark: colorScheme == .dark)
+        let container = Color(argb: colors.container)
         let onContainer = Color(argb: colors.onContainer)
+        let badge = Self.badgeShapes[Int(JavaHash.of(category.id) & 0x7fffffff) % Self.badgeShapes.count]
         let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
         Button(action: action) {
             Color.clear
-                .aspectRatio(1.45, contentMode: .fit)
+                .frame(height: 96)
+                .frame(maxWidth: .infinity)
                 .overlay(alignment: .bottomTrailing) {
-                    GenreIconImage(icon: .forGenre(category.name), color: onContainer)
-                        .scaledToFit()
-                        .padding(.leading, 8)
-                        .padding(.top, 8)
-                        .frame(width: 96, height: 96)
-                        .rotationEffect(.degrees(-14))
-                        .opacity(0.32)
+                    ExpressiveBadgeShape(badge)
+                        .fill(container.mix(with: onContainer, by: 0.45))
+                        .frame(width: 84, height: 84)
+                        .offset(x: 16, y: 18)
                         .accessibilityHidden(true)
                 }
                 .overlay(alignment: .topLeading) {
                     GeometryReader { proxy in
                         Text(category.name)
-                            .pixlFont(.custom(size: 20, weight: .bold, lineHeight: 28))
+                            .pixlFont(.custom(size: 18, weight: .bold, lineHeight: 28))
                             .foregroundStyle(onContainer)
                             .lineLimit(2)
                             .padding(.leading, 16)
@@ -135,9 +140,18 @@ struct SearchCategoryCard: View {
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
-        .pixlGlass(in: shape, tint: Color(argb: colors.container).opacity(GlassTint.container), interactive: true)
+        .pixlGlass(in: shape, tint: container.opacity(GlassTint.container), interactive: true)
         .accessibilityLabel(category.name)
         .accessibilityIdentifier("search.category.\(category.id)")
+    }
+}
+
+/// Java's `String.hashCode` (UTF-16, wrapping Int32), so a pick keyed on it matches Android.
+nonisolated enum JavaHash {
+    static func of(_ string: String) -> Int32 {
+        var hash: Int32 = 0
+        for unit in string.utf16 { hash = hash &* 31 &+ Int32(unit) }
+        return hash
     }
 }
 

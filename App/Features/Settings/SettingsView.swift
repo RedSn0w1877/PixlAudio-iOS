@@ -1,41 +1,117 @@
 import PixlModel
 import SwiftUI
 
-/// Settings (Android `SettingsScreen`, Material 3 mode): the collapsing "Settings" header and two groups of rows. The
-/// first is the everyday categories — Accounts first (the app is Spotify-only), About last. The second is the
-/// "Developer mode" switch and, while it is on, the Developer and Device capabilities rows right under it. Each row is
-/// 88 pt: a 56 pt coloured circle with the category icon, the title (`titleMedium` semibold) and a two-line subtitle
-/// (`bodyMedium`, 65 %). Rows are glass shapes 2 pt apart; a group's first row has 24 pt top corners, the last 24 pt
-/// bottom corners, the rest 4 pt.
+/// Settings (Android `SettingsScreen`, redesign 2 2026-11-25, mockup AndroidSettings). The header scrolls with the list
+/// (no collapsing bar): 20 pt under the status bar a 48 pt row — Back as a 48 pt neutral glass circle, 12 pt,
+/// "Settings" 36/44 bold — then blocks 14 pt apart in the 16 pt gutter: the Accounts card (72 pt, `primaryContainer`
+/// glass, 28 pt corners, a 52 pt Cookie9 badge), "Listening" (Playback, Equalizer, Lyrics, Sing, Endless Listening,
+/// Song Tap) and "App" (AI, Music management, Appearance, Behaviour, Backup, About, then the Developer mode switch and,
+/// while it is on, Developer and Device capabilities). Rows are `RedesignGroupedRow`s (title only, 52 pt), badges in
+/// each category's colour pair on shapes cycling Cookie9, Sunny, Flower, Clover4, SoftBurst, Cookie6.
 ///
 /// Dropped from Android: the "PixelPlayer Plus" card at the top (everything is unlocked on iOS).
 struct SettingsView: View {
     @Environment(Router.self) private var router
     @Environment(SettingsStore.self) private var settings
+    @Environment(\.appTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         @Bindable var experimental = settings.experimental
         let developerMode = experimental.developerMode
-        SettingsScaffold(title: L10n.commonSettings, screenID: "settings", spacing: 0) {
-            SettingsGroup(outer: 24, inner: 4) {
-                ForEach(SettingsMainEntry.everyday) { entry in
-                    SettingsCategoryRow(entry: entry) { open(entry) }
+        let app = SettingsMainEntry.app
+        let advanced = SettingsMainEntry.developerOnly
+        let appTotal = app.count + 1 + (developerMode ? advanced.count : 0)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                header
+                SettingsAccountsCard { router.push(.accounts) }
+                VStack(spacing: 0) {
+                    RedesignSectionLabel(LocalizedStringKey(L10n.settingsGroupListening))
+                    GlassEffectContainer(spacing: 0) {
+                        VStack(spacing: Redesign.rowGap) {
+                            ForEach(Array(SettingsMainEntry.listening.enumerated()), id: \.element) { index, entry in
+                                SettingsCategoryRow(entry: entry, badge: .cycled(index),
+                                                    shape: groupedRowShape(index: index,
+                                                                           count: SettingsMainEntry.listening.count)) {
+                                    open(entry)
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            Spacer().frame(height: 16)
-            SettingsGroup(outer: 24, inner: 4) {
-                SwitchSettingRow(title: L10n.settingsMainDeveloperModeTitle,
-                                 subtitle: L10n.settingsMainDeveloperModeSubtitle,
-                                 isOn: $experimental.developerMode, systemImage: "wrench.and.screwdriver")
-                if developerMode {
-                    ForEach(SettingsMainEntry.developerOnly) { entry in
-                        SettingsCategoryRow(entry: entry) { open(entry) }
+                VStack(spacing: 0) {
+                    RedesignSectionLabel(LocalizedStringKey(L10n.settingsGroupApp))
+                    GlassEffectContainer(spacing: 0) {
+                        VStack(spacing: Redesign.rowGap) {
+                            ForEach(Array(app.enumerated()), id: \.element) { index, entry in
+                                SettingsCategoryRow(entry: entry, badge: .cycled(index + 4),
+                                                    shape: groupedRowShape(index: index, count: appTotal)) {
+                                    open(entry)
+                                }
+                            }
+                            developerModeRow(isOn: $experimental.developerMode,
+                                             shape: groupedRowShape(index: app.count, count: appTotal))
+                            if developerMode {
+                                ForEach(Array(advanced.enumerated()), id: \.element) { index, entry in
+                                    SettingsCategoryRow(entry: entry, badge: .cycled(index + 2),
+                                                        shape: groupedRowShape(index: app.count + 1 + index,
+                                                                               count: appTotal)) {
+                                        open(entry)
+                                    }
+                                    .transition(.opacity)
+                                }
+                            }
+                        }
                     }
                 }
             }
-            Spacer().frame(height: 32)
+            .padding(.horizontal, Redesign.gutter)
+            .padding(.top, 20)
+            .padding(.bottom, 40)
         }
+        .scrollIndicators(.hidden)
+        .background(theme.background.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .background(SettingsBackSwipeEnabler().frame(width: 0, height: 0))
         .animation(PixlMotion.state, value: developerMode)
+        .accessibilityIdentifier("screen.settings")
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(theme.onSurface)
+                    .frame(width: 48, height: 48)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .pixlGlass(in: Circle(), tint: theme.surfaceContainerHigh.opacity(GlassTint.surface), interactive: true)
+            .accessibilityLabel("Back")
+            .accessibilityIdentifier("settings.back")
+            RedesignScreenTitle(LocalizedStringKey(L10n.commonSettings))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: 48)
+    }
+
+    /// The Developer mode switch closing the App group (Clover4 badge in Developer's colours). The switch is the system's.
+    private func developerModeRow(isOn: Binding<Bool>, shape: UnevenRoundedRectangle) -> some View {
+        let colors = SettingsMainEntry.category(.developer).colors(dark: theme.isDark)
+        return RedesignGroupedRow(title: L10n.settingsMainDeveloperModeTitle, shape: shape,
+                                  action: { withAnimation(PixlMotion.state) { isOn.wrappedValue.toggle() } }) {
+            ShapeBadge(systemImage: "chevron.left.forwardslash.chevron.right", shape: .clover4,
+                       container: Color(argb: colors.0), content: Color(argb: colors.1))
+        } trailing: {
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(theme.primary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .accessibilityIdentifier("settings.switch.\(L10n.settingsMainDeveloperModeTitle)")
     }
 
     private func open(_ entry: SettingsMainEntry) {
@@ -46,6 +122,46 @@ struct SettingsView: View {
         case .category(let category): router.push(.settingsCategory(category))
         case .accounts: router.push(.accounts)
         }
+    }
+}
+
+/// The Accounts card at the top of Settings (redesign 2, Android `SettingsAccountsCard`): 72 pt, `primaryContainer`
+/// glass, 28 pt corners, 10 / 12 pt padding; a 52 pt Cookie9 badge (`onPrimaryContainer` fill, the 26 dp account icon
+/// in `primaryContainer`), 14 pt, "Accounts" 18/24 medium over its line 13/18, a chevron.
+struct SettingsAccountsCard: View {
+    let action: () -> Void
+    @Environment(\.appTheme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ShapeBadge(systemImage: "person.crop.circle", shape: .cookie9, container: theme.onPrimaryContainer,
+                           content: theme.primaryContainer, size: 52, iconSize: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.settingsCategoryAccountsTitle)
+                        .pixlFont(.custom(size: 18, weight: .medium, lineHeight: 24))
+                        .lineLimit(1)
+                    Text(L10n.settingsMainAccountsSubtitle)
+                        .pixlFont(.redesignRowSubtitle)
+                        .lineLimit(1)
+                }
+                .foregroundStyle(theme.onPrimaryContainer)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(theme.onPrimaryContainer)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 12)
+            .frame(height: 72)
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .pixlGlass(in: shape, tint: theme.primaryContainer.opacity(GlassTint.prominent), interactive: true)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("settings.accounts")
     }
 }
 
@@ -61,11 +177,18 @@ nonisolated enum SettingsMainEntry: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The everyday rows, top to bottom: Accounts, Appearance, Playback, Equalizer, Lyrics, Sing, Song Tap, Gestures & haptics,
-    /// Library & storage, AI features, Backup & Restore, About.
-    static let everyday: [SettingsMainEntry] = [
-        .accounts, .category(.appearance), .category(.playback), .category(.equalizer), .category(.lyrics),
-        .category(.sing), .category(.songTap), .category(.behavior), .category(.library), .category(.ai), .category(.endless), .category(.backupRestore),
+    /// The everyday rows, top to bottom (redesign 2): Accounts (the card), the Listening group, then the App group.
+    static var everyday: [SettingsMainEntry] { [.accounts] + listening + app }
+
+    /// Redesign 2: the "Listening" group (Android `SettingsListeningCategories`).
+    static let listening: [SettingsMainEntry] = [
+        .category(.playback), .category(.equalizer), .category(.lyrics), .category(.sing), .category(.endless),
+        .category(.songTap),
+    ]
+
+    /// Redesign 2: the "App" group, before the Developer mode switch.
+    static let app: [SettingsMainEntry] = [
+        .category(.ai), .category(.library), .category(.appearance), .category(.behavior), .category(.backupRestore),
         .category(.about),
     ]
 
@@ -183,45 +306,22 @@ extension SettingsCategory {
     }
 }
 
-/// Android `ExpressiveCategoryItem` / `ExpressiveNavigationItem`.
+/// One category row of the main list (redesign 2, Android `SettingsCategoryRow`): a `RedesignGroupedRow` with the
+/// category's 40 pt shape badge (its colour pair) and the title only.
 struct SettingsCategoryRow: View {
     let entry: SettingsMainEntry
+    let badge: BadgeShapeKind
+    let shape: UnevenRoundedRectangle
     let action: () -> Void
 
     @Environment(\.appTheme) private var theme
 
     var body: some View {
         let colors = entry.colors(dark: theme.isDark)
-        Button(action: action) {
-            HStack(spacing: 0) {
-                ZStack {
-                    Circle().fill(Color(argb: colors.0))
-                    Image(systemName: entry.systemImage)
-                        .font(.system(size: 21, weight: .semibold))
-                        .foregroundStyle(Color(argb: colors.1))
-                }
-                .frame(width: 56, height: 56)
-                .accessibilityHidden(true)
-                Spacer().frame(width: 16)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(entry.title)
-                        .pixlFont(.titleMedium, weight: .semibold)
-                        .foregroundStyle(theme.onSurface)
-                        .lineLimit(1)
-                    Text(entry.subtitle)
-                        .pixlFont(.bodyMedium)
-                        .foregroundStyle(theme.onSurface.opacity(0.65))
-                        .lineLimit(2)
-                }
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Spacer().frame(width: 8)
-            }
-            .padding(16)
-            .frame(minHeight: 88)
+        RedesignGroupedRow(title: entry.title, shape: shape, action: action) {
+            ShapeBadge(systemImage: entry.systemImage, shape: badge, container: Color(argb: colors.0),
+                       content: Color(argb: colors.1))
         }
-        .buttonStyle(.plain)
-        .settingsRowGlass(interactive: true)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("settings.\(entry.id)")

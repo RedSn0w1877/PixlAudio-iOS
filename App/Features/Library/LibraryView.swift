@@ -2,16 +2,16 @@ import PixlLibrary
 import PixlModel
 import SwiftUI
 
-/// PixlAudio's Library (Android `LibraryScreen`, default tabs navigation), ported with Liquid Glass:
-/// - the screen background gradient (dark: `primaryContainer` 50 % → clear; light: `onPrimaryContainer` 20 % → clear)
-///   and the header band tinted `primaryContainer` 40 % holding the "Library" title (40 pt heavy, `primary`) with
-///   its settings circle, and the category tab row (glass capsules, gliding `primary` selection, an Edit capsule
-///   that opens the reorder sheet);
-/// - the content panel (`surface`, 34 pt top corners) with the action row (Shuffle / New, locate, instrumental
-///   filter, sort — or the selection row) and the swipeable tab pages (Songs, Albums grid/list, Artists, Playlists,
-///   Liked); with no Spotify account linked and nothing in the library, a Connect Spotify state instead;
+/// PixlAudio's Library (Android `LibraryScreen`, redesign 2 2026-11-25, mockup AndroidLibrary), ported with Liquid
+/// Glass:
+/// - a flat `surface` page; the header row ("Library" 36/44 bold, the tab's main action and Settings as 48 pt glass
+///   squares) over one filter chip per tab plus the Edit chip (reorder sheet) — or, in compact navigation, the tab pill
+///   over the pager dots;
+/// - the tools row (sort text button + menu, the connected Locate / Instrumental / List | Grid group — or the
+///   selection row) and the swipeable tab pages (Songs, Albums grid/list, Artists, Playlists, Liked); with no Spotify
+///   account linked and nothing in the library, a Connect Spotify state instead;
 /// - long press multi-selection for songs, albums (max 6) and playlists, with the floating count pill and the
-///   selection sheets; the sort sheet, the reorder sheet and the playlist creation flow.
+///   selection sheets; the sort menu, the reorder sheet and the playlist creation flow.
 struct LibraryView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(LibraryStore.self) private var library
@@ -89,68 +89,60 @@ struct LibraryView: View {
 
     // MARK: Background and header
 
+    /// Redesign 2: a flat `surface` everywhere (no tinted header band, no rounded content sheet).
     private var background: some View {
-        ZStack {
-            theme.background
-            LinearGradient(colors: [theme.isDark ? theme.primaryContainer.opacity(0.5) : theme.onPrimaryContainer.opacity(0.2),
-                                    .clear],
-                           startPoint: .top, endPoint: .bottom)
-        }
+        theme.surface
     }
 
-    /// Settings › Library Navigation (Android `LibraryNavigationMode`): the "Library" title over the tab row, or
-    /// (`compact_pill`) the current tab's pill — which opens the tab menu — over the pager dots.
+    /// Redesign 2 (Android `LibraryRedesignHeader` + `LibraryTabChips`, mockup AndroidLibrary): status bar + 12 pt,
+    /// a 48 pt row in the 16 pt gutter — "Library" 36/44 bold, then the tab's main action (48 pt accent square: "+" New
+    /// playlist on Playlists, Shuffle elsewhere) and Settings (neutral), 8 pt apart — 16 pt, then one filter chip per
+    /// tab in the user's order plus an outlined Edit chip (the reorder sheet), 8 pt apart, then 8 pt. Settings ›
+    /// Library Navigation (`compact_pill`) keeps its pill and the pager dots in the chips' slot.
     private func header(_ prefs: LibraryPreferences) -> some View {
         let isCompact = settings.appearance.libraryNavigationMode == LibraryNavigationMode.compactPill
         return VStack(spacing: 0) {
-            if isCompact {
-                HStack(spacing: 0) {
-                    LibraryNavigationPill(tab: tab, tabs: prefs.tabOrder,
-                                          onSelect: { newTab in withAnimation(PixlMotion.state) { selectedTab = newTab } },
-                                          onReorder: { sheet = .reorderTabs })
-                    Spacer(minLength: Tokens.Spacing.s)
-                    settingsButton
+            HStack(spacing: 8) {
+                RedesignScreenTitle("Library")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                RedesignHeaderButton(systemImage: tab == .playlists ? "plus" : "shuffle",
+                                     accessibilityLabel: tab == .playlists ? "Create new playlist" : "Shuffle Play",
+                                     accent: true, action: mainAction)
+                    .accessibilityIdentifier("library.mainAction")
+                RedesignHeaderButton(systemImage: "gearshape", accessibilityLabel: "Settings") {
+                    router.push(.settings)
                 }
-                .padding(.leading, LibraryNavigationPill.leadingInset)
-                .padding(.trailing, Tokens.TopBar.actionTrailing)
-                .frame(height: Tokens.TopBar.height)
+                .accessibilityIdentifier("library.settings")
+            }
+            .frame(height: Redesign.headerButtonSize)
+            .padding(.horizontal, Redesign.gutter)
+            Spacer().frame(height: 16)
+            if isCompact {
+                LibraryNavigationPill(tab: tab, tabs: prefs.tabOrder,
+                                      onSelect: { newTab in withAnimation(PixlMotion.state) { selectedTab = newTab } },
+                                      onReorder: { sheet = .reorderTabs })
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Redesign.gutter)
                 CompactLibraryPagerIndicator(currentIndex: prefs.tabOrder.firstIndex(of: tab) ?? 0,
                                              pageCount: prefs.tabOrder.count)
-                    .padding(.top, 2)
-                    .padding(.bottom, 10)
+                    .padding(.top, 8)
             } else {
-                LargeHeader("Library") { settingsButton }
-                GlassPillRow(items: prefs.tabOrder.map { GlassPillRow<LibraryTab>.Item(id: $0, title: $0.tabTitle) },
-                             selection: Binding(get: { tab }, set: { newTab in selectedTab = newTab }),
-                             accessibilityIdentifierPrefix: "library.tab",
-                             accessory: GlassPillRow<LibraryTab>.Accessory(systemImage: "pencil",
-                                                                           accessibilityLabel: "Reorder tabs",
-                                                                           action: { sheet = .reorderTabs }))
+                LibraryTabChips(tabs: prefs.tabOrder, selected: tab,
+                                onSelect: { newTab in withAnimation(PixlMotion.state) { selectedTab = newTab } },
+                                onEdit: { sheet = .reorderTabs })
             }
         }
-        .background(theme.primaryContainer.opacity(0.4).ignoresSafeArea(edges: .top))
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
-    private var settingsButton: some View {
-        GlassCircleButton(systemImage: "gearshape.fill", accessibilityLabel: "Settings",
-                          tint: theme.primaryContainer.opacity(GlassTint.prominent),
-                          foreground: theme.onPrimaryContainer) {
-            router.push(.settings)
-        }
-        .accessibilityIdentifier("library.settings")
-    }
-
-    // MARK: Content panel
+    // MARK: Content
 
     private func contentPanel(_ prefs: LibraryPreferences) -> some View {
-        let panelShape = UnevenRoundedRectangle(topLeadingRadius: Tokens.Radius.contentPanel, bottomLeadingRadius: 0,
-                                                bottomTrailingRadius: 0, topTrailingRadius: Tokens.Radius.contentPanel,
-                                                style: .continuous)
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             actionRow(prefs)
-                .padding(.top, 6)
-                .padding(.horizontal, 10)
-                .frame(minHeight: 56)
+                .padding(.horizontal, Redesign.gutter)
+                .frame(minHeight: 48)
             ZStack(alignment: .top) {
                 if library.songs.isEmpty, !library.isLoading, accounts.needsSpotifyConnection {
                     ConnectSpotifyEmptyState()
@@ -166,8 +158,6 @@ struct LibraryView: View {
             .padding(.top, 8)
             .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelecting)
         }
-        .background(panelShape.fill(theme.surface).ignoresSafeArea(edges: .bottom))
-        .background(theme.primaryContainer.opacity(0.4).ignoresSafeArea(edges: .bottom))
     }
 
     private var selectionCount: Int {
@@ -189,13 +179,12 @@ struct LibraryView: View {
                 let tab = self.tab
                 LibraryLocateState(tab: tab, isInstrumentalizedOnly: instrumentalizedOnly,
                                    model: model, actions: actions) { showsLocate in
-                    LibraryActionRow(tab: tab,
-                                     showsLocate: showsLocate,
-                                     isInstrumentalizedOnly: instrumentalizedOnly,
-                                     onMainAction: mainAction,
-                                     onLocate: { locateRequests[tab, default: 0] += 1 },
-                                     onInstrumentalFilter: { instrumentalizedOnly.toggle() },
-                                     prefs: prefs)
+                    LibraryToolsRow(tab: tab,
+                                    showsLocate: showsLocate,
+                                    isInstrumentalizedOnly: instrumentalizedOnly,
+                                    onLocate: { locateRequests[tab, default: 0] += 1 },
+                                    onInstrumentalFilter: { instrumentalizedOnly.toggle() },
+                                    prefs: prefs)
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }

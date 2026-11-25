@@ -1,19 +1,17 @@
 import PixlModel
 import SwiftUI
 
-/// Search's filter chips (Android `SearchFilterChip`s in a `FlowRow`): All, Songs, Albums, Artists, Playlists.
-/// Each Material `FilterChip` (32 pt capsule inside its 48 pt touch target; selected = `primary` with a check icon,
-/// others `secondaryContainer`) becomes a glass capsule tinted with that role. The selected tint is one glass shape
-/// with a shared `glassEffectID`, so it glides to the newly selected chip. The catalogue and YouTube Music are
-/// result sections, never chips (as on Android).
+/// Search's results filter (redesign 2, Android `SearchFilterGroup`, mockup AndroidSearchResults): one connected
+/// group, 44 pt tall, 2 pt gaps, equal widths, outer corners 22 / inner 8; the selected segment is `primary` glass and
+/// fully round, the others `surfaceContainerHigh` glass with an `onSurface` label (14/20 medium). Order: All, Songs,
+/// Artists, Albums, Playlists. The catalogue and YouTube Music are result sections, never segments (as on Android).
 struct SearchFilterChips: View {
     @Binding var selection: SearchFilterType
 
     @Environment(\.appTheme) private var theme
-    @Namespace private var glassNamespace
 
-    /// Android `GlassSearchFilters` / the chips' order and labels.
-    static let filters: [SearchFilterType] = [.all, .songs, .albums, .artists, .playlists]
+    /// Android `SearchFilterGroupOrder`.
+    static let filters: [SearchFilterType] = [.all, .songs, .artists, .albums, .playlists]
 
     static func title(_ filter: SearchFilterType) -> String {
         switch filter {
@@ -22,64 +20,29 @@ struct SearchFilterChips: View {
         case .albums: "Albums"
         case .artists: "Artists"
         case .playlists: "Playlists"
-        case .catalog, .youtubeMusic: "Songs" // never a chip (Android maps them to the Songs label too)
+        case .catalog, .youtubeMusic: "Songs" // never a segment (Android maps them to the Songs label too)
         }
     }
 
-    nonisolated private enum GlassID: Hashable, Sendable {
-        case selection
-        case chip(String)
-    }
-
     var body: some View {
-        // Container spacing well below the 8 pt gap: chips render together but never blend at rest.
-        GlassEffectContainer(spacing: 3) {
-            SearchFlowLayout(horizontalSpacing: 8, verticalSpacing: 0) {
-                ForEach(Self.filters, id: \.self) { filter in
-                    chip(filter, title: Self.title(filter))
+        // Container spacing below the 2 pt gap: the segments render together but never blend at rest.
+        GlassEffectContainer(spacing: 1) {
+            HStack(spacing: Redesign.groupGap) {
+                ForEach(Array(Self.filters.enumerated()), id: \.element) { index, filter in
+                    RedesignGroupButton(position: .of(index, count: Self.filters.count), isSelected: filter == selection,
+                                        height: 44, inner: 8, horizontalPadding: 6,
+                                        action: { withAnimation(PixlMotion.selection) { selection = filter } }) { tint in
+                        Text(Self.title(filter))
+                            .pixlFont(.redesignLabel)
+                            .foregroundStyle(filter == selection ? tint : theme.onSurface)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .accessibilityIdentifier("search.filter.\(filter.rawValue.lowercased())")
                 }
             }
         }
         .pixlHaptic(.selection, trigger: selection)
-    }
-
-    private func chip(_ filter: SearchFilterType, title: String) -> some View {
-        let isSelected = filter == selection
-        return Button {
-            withAnimation(PixlMotion.selection) { selection = filter }
-        } label: {
-            HStack(spacing: 8) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 18, height: 18)
-                        .transition(.scale.combined(with: .opacity))
-                }
-                Text(title)
-                    .pixlFont(.labelLarge)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isSelected ? theme.onPrimary : theme.onSecondaryContainer)
-            // FilterChip: 8 pt outer padding + 8 pt around the label; 8 pt before a leading icon.
-            .padding(.leading, isSelected ? 8 : 16)
-            .padding(.trailing, 16)
-            .frame(height: 32)
-            .contentShape(.capsule)
-            .glassEffect(
-                Glass.regular
-                    .tint(isSelected ? theme.primary.opacity(GlassTint.prominent)
-                                     : theme.secondaryContainer.opacity(GlassTint.container))
-                    .interactive(),
-                in: Capsule()
-            )
-            .glassEffectID(isSelected ? GlassID.selection : GlassID.chip(title), in: glassNamespace)
-            // Material's 48 pt minimum touch target around the 32 pt chip.
-            .frame(height: 48)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("search.filter.\(filter.rawValue.lowercased())")
     }
 }
 
