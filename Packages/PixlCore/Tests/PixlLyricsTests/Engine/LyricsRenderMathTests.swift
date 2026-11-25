@@ -57,6 +57,40 @@ struct LyricsRenderMathTests {
         #expect(LyricsRenderMetrics.fontSize(textScale: 0.1) == 34 * 0.6)
     }
 
+    @Test func backgroundVocalsFollowTheirDuetLineToTheEndSide() throws {
+        let p = try #require(PreparedLyricsBuilder.build(Lyrics(synced: [
+            SyncedLine(time: 1_000, line: "Lead line", endTime: 3_000),
+            SyncedLine(time: 1_500, line: "lead echo", voiceRole: "background"),
+            SyncedLine(time: 5_000, line: "Duet line", endTime: 7_000, voiceRole: "duet"),
+            SyncedLine(time: 5_500, line: "duet echo", voiceRole: "background"),
+            SyncedLine(time: 40_000, line: "lonely echo", endTime: 41_000, voiceRole: "background"),
+        ])))
+        let byText = Dictionary(uniqueKeysWithValues: p.lines.map { ($0.text, $0) })
+        let leadEcho = try #require(byText["lead echo"]), duetEcho = try #require(byText["duet echo"])
+        let duet = try #require(byText["Duet line"]), orphan = try #require(byText["lonely echo"])
+        #expect(p.sideRole(of: leadEcho) == .background)
+        #expect(p.sideRole(of: duetEcho) == .duet)
+        #expect(p.sideRole(of: duet) == .duet)
+        #expect(p.sideRole(of: orphan) == .background, "an orphan stays on the start side")
+
+        let m = LyricsRenderMetrics(hasDuet: true)
+        // The duet's echo sits exactly where the duet line does: same paddings, end-aligned, pivot on the right.
+        #expect(m.startPadding(role: p.sideRole(of: duetEcho), width: 400) == m.startPadding(role: .duet, width: 400))
+        #expect(m.endPadding(role: p.sideRole(of: duetEcho), width: 400) == 24)
+        #expect(m.textAlign(role: p.sideRole(of: duetEcho)) == .end)
+        #expect(m.pivotX(duetEcho, side: p.sideRole(of: duetEcho)) == 1)
+        #expect(m.pivotX(leadEcho, side: p.sideRole(of: leadEcho)) == 0)
+        // Its size still follows its own role.
+        #expect(m.fontSize(role: duetEcho.role) == m.bgEmPx)
+
+        // Outside a duet song a background vocal never moves.
+        let solo = try #require(PreparedLyricsBuilder.build(Lyrics(synced: [
+            SyncedLine(time: 1_000, line: "Lead line", endTime: 3_000),
+            SyncedLine(time: 1_500, line: "lead echo", voiceRole: "background"),
+        ])))
+        #expect(solo.lines.allSatisfy { solo.sideRole(of: $0) == $0.role })
+    }
+
     @Test func rowLayoutStacksBlocksAndRoundsTheHeight() throws {
         let m = LyricsRenderMetrics()
         let row = LyricRowLayout.compute(metrics: m, role: .lead, width: 400, mainHeight: 41, romanizationHeight: 26.2,

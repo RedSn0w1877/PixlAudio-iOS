@@ -11,6 +11,10 @@ final class LyricsScreenshotTests: XCTestCase {
     func testEmphasisPeak() throws { try capture("lyricsEmphasis", demo: "words", freezeMs: 47_600) }
     func testInterludeDots() throws { try capture("lyricsInterlude", demo: "words", freezeMs: 61_000) }
     func testDuetBackgroundVocals() throws { try capture("lyricsDuet", demo: "duet", freezeMs: 42_300) }
+    /// "(let it go)" answers the duet line "Follow the river…": it sits on the duet (end) side with it.
+    func testDuetBackgroundFollowsItsLine() throws { try capture("lyricsDuetEcho", demo: "duet", freezeMs: 39_000) }
+    /// The emphasis on "higher" at the end of a duet (end-aligned) line: its scale and glow are not cut at the edge.
+    func testDuetEmphasisPeak() throws { try capture("lyricsDuetEmphasis", demo: "duet", freezeMs: 47_600) }
     func testBrightArt() throws { try capture("lyricsBrightArt", demo: "words", freezeMs: 42_300, extra: ["-lyricsBrightArt"]) }
     func testIncreasedContrast() throws {
         try capture("lyricsHighContrast", demo: "words", freezeMs: 42_300, extra: ["-lyricsHighContrast"])

@@ -54,6 +54,16 @@ public struct PreparedLyrics: Sendable, Hashable {
         hasher.combine(hasDuet)
         hasher.combine(startsSorted)
     }
+
+    /// The role that decides which side a line sits on (paddings, text alignment, scale pivot). A background vocal
+    /// grouped under a duet line follows that line to the end side in a duet song; every other line keeps its own
+    /// role. The font size still follows `PreparedLine.role` (background vocals stay 0.65 em).
+    public func sideRole(of line: PreparedLine) -> PreparedVoiceRole {
+        guard hasDuet, line.isGroupedBackground, lines.indices.contains(line.groupLeadIndex),
+              lines[line.groupLeadIndex].role == .duet
+        else { return line.role }
+        return .duet
+    }
 }
 
 /// Voice of a line (Android `presentation.lyrics.model.VoiceRole`). Parsed from the `voiceRole` strings `"lead"`,

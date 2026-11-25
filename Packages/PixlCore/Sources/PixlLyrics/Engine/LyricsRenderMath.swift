@@ -129,9 +129,12 @@ public struct LyricsRenderMetrics: Sendable, Hashable {
     }
 
     /// Scale pivot X (0 = start edge, 1 = end edge): duet, RTL and end-aligned lines pivot on the right.
-    public func pivotX(_ line: PreparedLine) -> Float {
+    public func pivotX(_ line: PreparedLine) -> Float { pivotX(line, side: line.role) }
+
+    /// `pivotX` for a line placed on the side of `side` (`PreparedLyrics.sideRole(of:)`).
+    public func pivotX(_ line: PreparedLine, side: PreparedVoiceRole) -> Float {
         let rtl = Self.isRtlText(line.text)
-        if hasDuet && line.role == .duet { return 1 }
+        if hasDuet && side == .duet { return 1 }
         if hasDuet { return rtl ? 1 : 0 }
         switch alignment {
         case .center: return 0.5
