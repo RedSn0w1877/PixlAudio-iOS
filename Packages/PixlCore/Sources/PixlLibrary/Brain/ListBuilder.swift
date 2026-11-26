@@ -49,10 +49,19 @@ public enum ListBuilder {
         public var noise: Double
         /// Index into the planner's kept candidates (stage 4: the planner re-reads this candidate's features for the served vector); -1 for none.
         public var idx: Int
+        /// The "choice" score of 6.5 (two lanes): what orders this candidate when it competes for a familiar slot. Defaults to `z` / `p`,
+        /// so a caller without a choice scorer builds exactly the list it built before. A novel candidate is always ordered by `z` / `p`.
+        public var zChoice: Double
+        public var pChoice: Double
+
+        /// The score of this candidate's lane: `z` when novel, `zChoice` when familiar.
+        public var laneZ: Double { novel ? z : zChoice }
+
+        public var laneP: Double { novel ? p : pChoice }
 
         public init(c: Candidate, arm: Int32, z: Double, p: Double, novel: Bool, bestRank: Int32, bestSeed: Int32,
                     newestSeedRank: Int32, lastMs: Int64, retrQ: Int32, servedPen: Double = 0.0, noise: Double = 0.0,
-                    idx: Int = -1) {
+                    idx: Int = -1, zChoice: Double? = nil, pChoice: Double? = nil) {
             self.c = c
             self.arm = arm
             self.z = z
@@ -66,6 +75,8 @@ public enum ListBuilder {
             self.servedPen = servedPen
             self.noise = noise
             self.idx = idx
+            self.zChoice = zChoice ?? z
+            self.pChoice = pChoice ?? p
         }
     }
 
@@ -214,7 +225,7 @@ public enum ListBuilder {
                     if s.novel || used.contains(s.c.rid) || !contains(aids, s.c.aid) || !okSlot(s.c) {
                         continue
                     }
-                    let key = BrainMath.orderKey(s.p)
+                    let key = BrainMath.orderKey(s.laneP)
                     if best == nil || better(key, s.c.rid, bestKey, best!.c.rid, request.tieSeed) {
                         best = s
                         bestKey = key
@@ -284,7 +295,7 @@ public enum ListBuilder {
                 for s in scored {
                     if s.novel || used.contains(s.c.rid) || !okSlot(s.c) { continue }
                     if s.lastMs != 0 && BrainMath.localDay(s.lastMs, tzOffsetMin: request.tzOffsetMin) == today { continue }
-                    let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
+                    let key = BrainMath.orderKey(s.laneP - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                         chosen = s
                         chosenKey = key
@@ -296,7 +307,7 @@ public enum ListBuilder {
             if chosen == nil && kind == slotCloser {
                 for s in scored {
                     if s.novel || used.contains(s.c.rid) || !okSlot(s.c) { continue }
-                    let key = BrainMath.orderKey(s.p - s.servedPen + s.noise)
+                    let key = BrainMath.orderKey(s.laneP - s.servedPen + s.noise)
                     if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                         chosen = s
                         chosenKey = key
@@ -383,7 +394,7 @@ public enum ListBuilder {
             back += 1
         }
         let gain = request.calibration != nil ? request.kappa * request.calibration!.gain(s.c.islandIdx) : 0.0
-        return request.lambda * s.z - (1.0 - request.lambda) * maxSim + gain - s.servedPen + s.noise
+        return request.lambda * s.laneZ - (1.0 - request.lambda) * maxSim + gain - s.servedPen + s.noise
     }
 
     /// True when `c` may take the next slot under the cap per artist (First Listen); always true without a cap.

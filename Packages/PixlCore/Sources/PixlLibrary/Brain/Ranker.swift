@@ -68,6 +68,33 @@ public enum Ranker {
 
     public static func m0(_ index: Int) -> Double { m0Table[index] }
 
+    /// The "choice" scorer of 6.5 (two lanes): what orders the familiar lane of every list. It is the finish scorer's weights (prior or
+    /// learned, whatever ranks the list) plus this fixed shift, so its prior is `M0 + choiceShift` (the 2026-11-26 candidate of
+    /// tools/eval: since_last 12-16 -> 0, track_aff 0.4, artist_aff_recent 1.0, tag_aff 0.4, sess_tag_pen -0.5) and the learner moves
+    /// it with the same events, without a second model. The discovery lane, skip prediction and the reward keep `weights` as they are.
+    static let choiceShiftTable: [Double] = {
+        var t = [Double](repeating: 0.0, count: d)
+        t[1] = -0.8
+        t[3] = 0.6
+        t[4] = -0.4
+        t[12] = 1.5
+        t[13] = 0.6
+        t[14] = 0.1
+        t[15] = -0.1
+        t[16] = -0.2
+        t[24] = 0.5
+        return t
+    }()
+
+    public static func choiceShift(_ index: Int) -> Double { choiceShiftTable[index] }
+
+    /// The choice weights for the finish weights `w` (from `weights` or a `WeightSource`): `w + choiceShift`, a new array.
+    public static func choiceWeights(_ w: [Double]) -> [Double] {
+        var c = w
+        for i in 0..<d { c[i] += choiceShiftTable[i] }
+        return c
+    }
+
     public static func sd0(_ index: Int) -> Double { sd0Table[index] }
 
     /// The weight vector for a listener whose base completion rate is `p0`.

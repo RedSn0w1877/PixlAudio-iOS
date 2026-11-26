@@ -157,6 +157,8 @@ public enum StationPlanner {
         let nowMs = request.nowMs
         let p0 = Affinity.p0(affinity, nowMs: nowMs)
         let weights = request.ranking?.weights(p0: p0) ?? Ranker.weights(p0: p0)
+        // 6.5, two lanes: the familiar lane is ordered by the choice scorer, the novel lane by the finish scorer.
+        let choiceWeights = Ranker.choiceWeights(weights)
         let precision = request.ranking?.precision()
         let cooc = Retrieval.cooc(request.seeds, affinity: affinity, nowMs: nowMs, p0: p0)
         let homeRow = request.mode == modeHomeRow
@@ -243,20 +245,25 @@ public enum StationPlanner {
                              session: session, graph: graph, nowMs: nowMs, p0: p0, allNovel: homeRow || firstListen,
                              out: &x, islands: request.islands)
             var z = Ranker.z(weights, x)
+            // A track the listener has is ordered by the choice scorer (only its familiar-lane value is read).
+            var zc = c.inLibrary ? Ranker.z(choiceWeights, x) : z
             if let stationSeed, station {
                 let s = request.closestOfSeeds
                     ? closestSeed(graph, c, request.seeds)
                     : Similarity.sim(graph, c.rid, c.aid, stationSeed.seedRid, stationSeed.seedAid)
-                let blend = 0.6 * s + 0.4 * x[Features.sessPosSim]
-                z += 1.2 * blend
+                let pull = 1.2 * (0.6 * s + 0.4 * x[Features.sessPosSim])
+                z += pull
+                zc += pull
             }
             // The listener's boost / reduce is applied after scoring, outside the model (5.11).
             z += c.boostLn
+            zc += c.boostLn
+            let p = precision != nil ? Ranker.p(z, x, precision!) : Ranker.p(z, x)
             scored.append(ListBuilder.Scored(
                 c: c,
                 arm: arms[i],
                 z: z,
-                p: precision != nil ? Ranker.p(z, x, precision!) : Ranker.p(z, x),
+                p: p,
                 novel: !c.inLibrary,
                 bestRank: bestRank,
                 bestSeed: entry?.bestSeed ?? -1,
@@ -267,7 +274,9 @@ public enum StationPlanner {
                 noise: (mix && request.jitter > 0.0)
                     ? request.jitter * (BrainHash.unit(BrainHash.splitmix64(UInt64(bitPattern: c.rid ^ request.tieSeed))) - 0.5)
                     : 0.0,
-                idx: i
+                idx: i,
+                zChoice: zc,
+                pChoice: !c.inLibrary ? p : (precision != nil ? Ranker.p(zc, x, precision!) : Ranker.p(zc, x))
             ))
         }
 
