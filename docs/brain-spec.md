@@ -638,6 +638,8 @@ B(t, now) = ln( sum_j c_j * powNeg( hours(now - t_j) + 1, d ) ),   d = 0.5
 
 `Brain.score(candidates, state, session, ctx, weights) -> [(rid, z, p)]` is the only scorer for every surface. `z = sum_i w_i * x_i`; `p = sigmoid(z / sqrt(1 + 0.3927 * s))` with `s = sum_i x_i^2 / q_i` (0.3927 is pi/8). Surfaces differ only in their candidate pool, their novelty share, their constraint set, and which features are live.
 
+**Two lanes (2026-11-26).** The score above predicts "will they finish it". Lists also need "will they pick it", so every list StationPlanner builds (autoplay, stations, mixes, Endless; home rows and First Listen are all novel and unaffected) orders its familiar lane (`inLibrary`) by a second, "choice" score: `zc = sum_i (w_i + CHOICE_SHIFT_i) * x_i` plus the same station pull and `boostLn` as `z`, `pc` from `zc` like `p`. `w` is whatever ranks the list (the prior `M0` with `logit(p0)`, the learned mean or its posterior sample), so the choice prior is `M0 + CHOICE_SHIFT` and the learner moves it with the same events, with no second model. `CHOICE_SHIFT` (`Ranker.choiceShift`): [1] -0.8, [3] +0.6, [4] -0.4, [12] +1.5, [13] +0.6, [14] +0.1, [15] -0.1, [16] -0.2, [24] +0.5, all others 0 (prior: since_last 12-16 -> 0, track_aff 0.4, artist_aff_recent 1.0, tag_aff 0.4, sess_tag_pen -0.5). The novel lane, the novelty share, skip prediction, the served `pQ`, the reward and the learner use `z` / `p` unchanged. Measured in tools/eval/RESULTS.md ("Two lanes").
+
 ### 5.8 Features and initial weights (D = 51)
 
 All features are scaled to roughly -1..1. A feature whose input is unknown is exactly 0. "From" is the first stage in which the feature can be non-zero.
@@ -875,6 +877,8 @@ coherence    on stations and autoplay a familiar slot with no candidate passing 
 novel arm    section 5.10 (Thompson draw over arms; priors frozen before stage 3)
 within slot  value(i) = lambda * z_i - (1 - lambda) * max over chosen j of sim(i, j) + kappa * calibGain(i) - flowCost(i) - servedPen(i)
              lambda = 0.75 inside one island, 0.6 across islands ;  kappa = 0.4 (0 before stage 2)
+lanes        z_i and p_i above are the lane's score: the choice score zc / pc (5.7) for a familiar candidate (opener, familiar, bridge,
+             closer and liked slots alike), the finish score z / p for a novel one. ListBuilder.Scored.zChoice / pChoice default to z / p.
 calibGain(i) = KL(P || Q_without) - KL(P || Q_with_i)
              P(c) = W_c^0.75 normalised over islands, floor 0.03 ;  Q = island mix of the list so far, smoothed 0.99 Q + 0.01 P
 flowCost(i)  = 0.15 * max(0, tempoDist(prev, i) - 0.17) + 0.05 * max(0, abs(gainPrev - gain_i) - 4) / 4 ;  unknown values cost 0

@@ -1128,3 +1128,4 @@ Android has no tests for a RunPod/R2 pipeline; everything here is new.
 | `brain/Stage5Golden` (`audiofeatures.jsonl`, `flow.jsonl`) | 708 lines | `BrainStage5GoldenTests.audioFeaturesMatchAndroid`, `flowMatchesAndroid` | PixlLibrary | ported | Bit for bit; `pcmHash` and `samples` checked before each estimate. |
 | `data/brain/AudioMeasurePolicyTest` (brain stage 5) | 2 | `BrainStage5StoreTests` (2 + the file round trip) | PixlLibrary | ported | |
 | `data/brain/MusicBrainMigrationsTest` 7 to 8 | 1 | n/a | — | n/a | iOS tables are keyed record files: a new file needs no migration (handoff S5-i1). |
+| `brain/BrainGoldenTest` (two lanes, Android `82237d9`: `lists`, `mixes`, `session`, `stage2a`, `eval` regenerated) | — | `BrainGoldenTests`, `BrainMixGoldenTests`, `BrainMilestone2GoldenTests` (the same tests, new files) | PixlLibrary | ported | The five files and `MANIFEST.sha256` copied unchanged from Android; no new test. |
