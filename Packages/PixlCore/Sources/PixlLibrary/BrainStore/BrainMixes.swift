@@ -352,6 +352,8 @@ public actor BrainMixes {
             excludedRids: taken.union(ignored), servedTimes: times, edges: edges, count: daypartMix ? Self.daypartCount : 0,
             islands: useIslands ? context : nil, islandIdx: islandIdx, embeddings: known.embeddings, tagsByRid: known.tags)
         if daypartMix { request.nuOverride = Self.daypartNu }
+        // Stage 5: smooth tempo, loudness and energy steps, and the energy arc of a Daily Mix (6.5).
+        request.flowFacts = known.flowFacts
         let plan = await engine.planMix(request)
         if plan.picks.isEmpty { return nil }
 

@@ -74,6 +74,8 @@ public enum StationPlanner {
         public var ranking: Ranker.WeightSource?
         /// Stage 3: the arm bandit of 5.10 (nil keeps stage 2's choice of the novel candidate, byte for byte).
         public var armPicker: (any ArmPicker)?
+        /// Stage 5: tempo, loudness and energy for the flow cost (`Flow`); nil keeps stage 4's lists, byte for byte.
+        public var flow: Flow.Context?
 
         public init(mode: Int32, count: Int, candidates: [Candidate], seeds: [Retrieval.SeedList],
                     prior: [ListBuilder.Prior] = [], nowMs: Int64, tzOffsetMin: Int32 = 0, nuMultiplier: Double = 1.0,
@@ -83,7 +85,8 @@ public enum StationPlanner {
                     islands: IslandContext? = nil, calibration: Calibration? = nil,
                     lambda: Double = ListBuilder.lambdaDefault, simSource: (any SimilaritySource)? = nil,
                     maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0, ranking: Ranker.WeightSource? = nil,
-                    armPicker: (any ArmPicker)? = nil) {
+                    armPicker: (any ArmPicker)? = nil, flow: Flow.Context? = nil) {
+            self.flow = flow
             self.ranking = ranking
             self.armPicker = armPicker
             self.islands = islands
@@ -311,7 +314,8 @@ public enum StationPlanner {
                 simSource: request.simSource,
                 maxPerArtist: request.maxPerArtist,
                 minNewArtistShare: request.minNewArtistShare,
-                armPicker: request.armPicker
+                armPicker: request.armPicker,
+                flow: request.flow
             ),
             scored: scored,
             graph: graph

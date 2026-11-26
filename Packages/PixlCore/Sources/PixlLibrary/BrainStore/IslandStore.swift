@@ -518,14 +518,25 @@ public struct CandidateDna: Sendable {
     public struct Known: Sendable {
         public var tags: [Int64: Tags.Vector]
         public var embeddings: Embeddings?
+        /// Stage 5: what the flow ordering reads (6.5); empty for none, and the lists are then what they were before.
+        public var flowFacts: [Int64: Flow.Facts]
+
+        public init(tags: [Int64: Tags.Vector], embeddings: Embeddings?, flowFacts: [Int64: Flow.Facts] = [:]) {
+            self.tags = tags
+            self.embeddings = embeddings
+            self.flowFacts = flowFacts
+        }
     }
 
     private let store: IslandStore
     private let dna: DnaRepository?
+    /// Stage 5: tempo, loudness and energy for the flow cost (6.5).
+    private let flow: (any FlowFactsSource)?
 
-    public init(store: IslandStore, dna: DnaRepository?) {
+    public init(store: IslandStore, dna: DnaRepository?, flow: (any FlowFactsSource)? = nil) {
         self.store = store
         self.dna = dna
+        self.flow = flow
     }
 
     /// `candidates` with an embedding, tags and popularity where they are known. Unknown stays unknown: nothing is guessed.
@@ -552,7 +563,8 @@ public struct CandidateDna: Sendable {
             for c in candidates where tags[c.rid] == nil { if let v = artistTags[c.aid] { tags[c.rid] = v } }
         }
         let out = candidates.map { c in c.withDna(emb: emb?.vector(c.rid), tags: tags[c.rid], popPermille: pop[c.rid] ?? -1) }
-        return (out, Known(tags: tags, embeddings: emb))
+        let flowFacts = await flow?.flowFacts(rids) ?? [:]
+        return (out, Known(tags: tags, embeddings: emb, flowFacts: flowFacts))
     }
 }
 

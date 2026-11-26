@@ -103,6 +103,9 @@ public enum MixPlanner {
         public var nuBase: Double = MixPlanner.nu0
         /// A list with its own novelty share (the daypart mix: 0.15, 6.2); negative for the share of its kind.
         public var nuOverride: Double = -1.0
+        /// Stage 5: tempo, loudness and energy by rid (`Flow`). A finite mix (a Daily Mix) also follows the energy arc; Your Mix and
+        /// First Listen only step smoothly. Empty keeps stage 4's lists, byte for byte.
+        public var flowFacts: [Int64: Flow.Facts] = [:]
 
         public init(kind: Int32, candidates: [Candidate], seeds: [Retrieval.SeedList], nowMs: Int64, tzOffsetMin: Int32,
                     nuMultiplier: Double = 1.0, salt: Int64 = 0, regenerate: Int32 = 0, excludedRids: Set<Int64> = [],
@@ -225,7 +228,8 @@ public enum MixPlanner {
                 maxPerArtist: first ? 2 : 0,
                 minNewArtistShare: first ? 0.4 : 0.0,
                 ranking: request.ranking,
-                armPicker: request.armPicker
+                armPicker: request.armPicker,
+                flow: request.flowFacts.isEmpty ? nil : Flow.Context(facts: request.flowFacts, arc: kind == kindDaily)
             ),
             affinity: affinity,
             session: session,

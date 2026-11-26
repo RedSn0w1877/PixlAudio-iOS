@@ -113,10 +113,18 @@ public struct AutoplayPlanInputs: Sendable {
     public var closestOfSeeds: Bool
     /// The plan replaces a whole tail by other picks ("Refresh picks"): a plan with none must not empty the tail.
     public var replaceAll: Bool
+    /// Stage 5: what plays just before the planned slots (the first slot's flow step), 0 when unknown.
+    public var leadRid: Int64
+    /// Stage 5: tempo, loudness and energy of the pool, the prior tail and the lead (6.5), read by the caller before the plan
+    /// (`flowRids`); empty plans exactly as before.
+    public var flowFacts: [Int64: Flow.Facts]
 
     public init(candidates: [Candidate], prior: [ListBuilder.Prior], excludedRids: Set<Int64>, seeds: [Retrieval.SeedList],
                 nuMultiplier: Double, nowMs: Int64, tzOffsetMin: Int32, batch: Int64, station: Station? = nil,
-                closestOfSeeds: Bool = false, replaceAll: Bool = false) {
+                closestOfSeeds: Bool = false, replaceAll: Bool = false, leadRid: Int64 = 0,
+                flowFacts: [Int64: Flow.Facts] = [:]) {
+        self.leadRid = leadRid
+        self.flowFacts = flowFacts
         self.closestOfSeeds = closestOfSeeds
         self.replaceAll = replaceAll
         self.candidates = candidates
@@ -128,6 +136,21 @@ public struct AutoplayPlanInputs: Sendable {
         self.tzOffsetMin = tzOffsetMin
         self.batch = batch
         self.station = station
+    }
+
+    /// The recordings whose flow facts a plan reads: the pool, the prior tail and the lead.
+    public var flowRids: [Int64] {
+        var rids: [Int64] = []
+        rids.reserveCapacity(candidates.count + prior.count + 1)
+        for c in candidates { rids.append(c.rid) }
+        for p in prior { rids.append(p.rid) }
+        if leadRid != 0 { rids.append(leadRid) }
+        return rids
+    }
+
+    /// The flow context of the plan (no arc: autoplay and stations have no end); nil when nothing is known.
+    public var flowContext: Flow.Context? {
+        flowFacts.isEmpty ? nil : Flow.Context(facts: flowFacts, lead: flowFacts[leadRid] ?? .unknown)
     }
 }
 
@@ -572,7 +595,9 @@ public actor BrainEngine {
             // 5.10: a novel slot goes to the arm the bandit draws, while the learned weights are on (nil: stage 2's choice, exactly).
             armPicker: state.armPicker(sessionId: state.session.sessionId, family: ArmBandit.station,
                                        seed: Int64(bitPattern: BrainHash.splitmix64(UInt64(bitPattern: state.session.sessionId ^ (inputs.batch << 8) ^ Self.armSeedTag))),
-                                       nowMs: clock()))
+                                       nowMs: clock()),
+            // Stage 5: smooth tempo, loudness and energy steps (6.5); nil without facts, exactly as before.
+            flow: inputs.flowContext)
         var plan: StationPlanner.Plan?
         if let tail {
             plan = Session.patchQueue(session, tail: tail, request: request, affinity: state.affinity, graph: graph)

@@ -17,6 +17,15 @@ public enum TrackDna {
     public static let gainUnknown = -32768
     public static let unknown = -1
 
+    // Where a tempo came from (3.2 `tempoSource`). Stage 5 adds the on-device measurement (`AudioFeatures`).
+    public static let tempoUnknown = 0
+    public static let tempoDeezer = 1
+    public static let tempoAcousticBrainz = 2
+    /// Measured on the phone with a confidence of at least `AudioFeatures.trustConf`: preferred over Deezer's.
+    public static let tempoOnDevice = 3
+    /// Measured on the phone below that confidence: used only when no source has a tempo.
+    public static let tempoOnDeviceWeak = 4
+
     public struct YearClaim: Sendable, Equatable {
         public var source: Int
         public var year: Int
@@ -182,6 +191,34 @@ public enum TrackDna {
         if energy < 0 { energy = 0 }
         if energy > 255 { energy = 255 }
         return Feel(energy: energy, valence: valence > 255 ? 255 : valence)
+    }
+
+    /// The tempo nudge on energy is at most this many points either way (stage 5).
+    public static let tempoNudgeMax = 15
+
+    /// Stage 5 (3.3: energy is "nudged by gain and tempo"): `feel`, then `energy += clamp(floor((bpm - mid) / 3), -15, 15)` where
+    /// `mid` is the tag-weighted middle of the tags' descriptor tempo bands (`(tempoLo + tempoHi) / 2`), when the tempo is known and
+    /// some tag has a band. Integer arithmetic on bpm x 10. Valence is not nudged.
+    public static func feel(_ atlas: GenreAtlas, _ tags: Tags.Vector, gainDbX10: Int, tempoBpmX10: Int) -> Feel {
+        let base = feel(atlas, tags, gainDbX10: gainDbX10)
+        if !base.known || tempoBpmX10 <= 0 { return base }
+        var num: Int64 = 0
+        var den: Int64 = 0
+        for t in tags.tags {
+            guard let d = atlas.descriptor(t.atlasId) else { continue }
+            if d.tempoLo <= 0 || d.tempoHi < d.tempoLo { continue }
+            num += Int64(t.q) * Int64(d.tempoLo + d.tempoHi) * 5 // the middle, x 10
+            den += Int64(t.q)
+        }
+        if den == 0 { return base }
+        let midX10 = (2 * num + den) / (2 * den)
+        var nudge = Int(BrainMath.floorDiv(Int64(tempoBpmX10) - midX10, 30))
+        if nudge < -tempoNudgeMax { nudge = -tempoNudgeMax }
+        if nudge > tempoNudgeMax { nudge = tempoNudgeMax }
+        var energy = base.energy + nudge
+        if energy < 0 { energy = 0 }
+        if energy > 255 { energy = 255 }
+        return Feel(energy: energy, valence: base.valence)
     }
 
     /// Up to 4 mood ids: the ones the tags' descriptors name most, by summed tag weight (ties: smaller id).

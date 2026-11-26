@@ -241,7 +241,8 @@ public struct Stage2bKit: Sendable {
     public let recent: RecentContexts
 
     public static func make(directory: URL, engine: BrainEngine, repository: BrainRepository, sources: MixSources,
-                            dna: DnaRepository?, atlas: any AtlasProvider, newReleases: NewReleases?) -> Stage2bKit {
+                            dna: DnaRepository?, atlas: any AtlasProvider, newReleases: NewReleases?,
+                            flow: (any FlowFactsSource)? = nil) -> Stage2bKit {
         let state = StateValues.of(engine)
         let islands = IslandStore(directory: directory, state: state)
         let libraryRids = LibraryRids(sources: sources, repository: repository)
@@ -249,7 +250,7 @@ public struct Stage2bKit: Sendable {
                                        timing: sources.timing)
         let picked = PickedArtists(state: state, repository: repository)
         let parts = Stage2bParts(islands: islands, builder: IslandBuilder(store: islands, inputs: inputs, state: state),
-                                 candidateDna: CandidateDna(store: islands, dna: dna), libraryRids: libraryRids, atlas: atlas,
+                                 candidateDna: CandidateDna(store: islands, dna: dna, flow: flow), libraryRids: libraryRids, atlas: atlas,
                                  newReleases: newReleases, dna: dna, picked: picked)
         let genre = dna.map { GenreStations(library: libraryRids, dna: $0, atlas: atlas, engine: engine, islands: islands) }
         return Stage2bKit(parts: parts, genre: genre, picked: picked, planStore: HomePlanStore(directory: directory),

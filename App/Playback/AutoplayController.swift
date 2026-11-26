@@ -404,8 +404,11 @@ final class AutoplayController {
         refreshNext = false
         let context = planContext(queue: queue, tailStart: start, tailEntries: tailEntries, refreshing: refreshing)
         let key = poolKey
+        let measures = brain.audioMeasures
         rescoreTask = Task { [weak self] in
-            let plan = await brainEngine.plan(context.inputs, count: tailRids.count, bridge: false, tail: tailRids)
+            // Stage 5: tempo, loudness and energy of the pool and of what plays before it, for smooth steps (6.5).
+            let inputs = await BrainService.withFlowFacts(context.inputs, from: measures)
+            let plan = await brainEngine.plan(inputs, count: tailRids.count, bridge: false, tail: tailRids)
             guard let self else { return }
             self.rescoreTask = nil
             self.applyRescore(plan, context: context, start: start, tailIds: tailIds, tailEntries: tailEntries, key: key)
@@ -772,8 +775,12 @@ final class AutoplayController {
         let planStation = context.inputs.station
         let bridge = planStation == nil && context.inputs.prior.isEmpty
         let count = StationRules.batchSize(isStation: planStation != nil, batchesSoFar: stationBatches)
+        let measures = brain.audioMeasures
         planTask = Task { [weak self] in
-            var plan = await brainEngine.plan(context.inputs, count: count, bridge: bridge, tail: nil)
+            // Stage 5: tempo, loudness and energy of the pool and of what plays before it, for smooth steps (6.5). An empty answer
+            // plans exactly as before.
+            let inputs = await BrainService.withFlowFacts(context.inputs, from: measures)
+            var plan = await brainEngine.plan(inputs, count: count, bridge: bridge, tail: nil)
             guard let self else { return }
             // On an output that plays only some tracks (Spotify Connect) the picks are looked up first, and the ones
             // it does not have never reach the queue. The plan stays "in flight" meanwhile: one plan at a time.
@@ -808,6 +815,8 @@ final class AutoplayController {
         let answers = await sources.playableOnRemote(songs)
         let kept = Set(AutoplayPolicy.keepPlayable(mediaIds: ids, playable: answers.map { $0 == true }).map(BrainKey.init))
         if kept.count == ids.count { return plan }
+        // Stage 5 (7.1): a pick the remote output cannot play is skipped, and said so in the log.
+        DiagnosticsLog.shared.log("autoplay", "\(ids.count - kept.count) of \(ids.count) picks left out, not playable on \(sources.remoteOutput())")
         // A pick whose lookup failed (a rate limit, an expired token, no network) is not one Spotify lacks: it stays in the
         // pool for a later plan and is only left out of this one.
         var unknown: Set<BrainKey> = []

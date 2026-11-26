@@ -55,6 +55,8 @@ struct DeveloperSettingsSection: View {
                 SettingsItemRow(title: BrainDataStrings.rowTitle, subtitle: BrainDataStrings.rowSubtitle,
                                 systemImage: "chart.bar.doc.horizontal", showsChevron: true,
                                 identifier: "settings.developer.brainData") { router.push(.brainData) }
+                // Stage 5: what the phone measured from the song that is playing (Android: right after Brain data).
+                BrainMeasureRow(measurer: environment.audioMeasurer)
                 ActionSettingRow(title: L10n.settingsForceDailyMixTitle, subtitle: L10n.settingsForceDailyMixSubtitle,
                                  systemImage: "slider.horizontal.3",
                                  primaryLabel: L10n.settingsActionRegenerateDailyMix) { showsDailyMix = true }

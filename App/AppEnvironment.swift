@@ -63,6 +63,9 @@ final class AppEnvironment {
     let brain: BrainService
     /// Autoplay (docs/brain-spec.md, 7.1): keeps the queue going with related music. Nil in UI tests.
     let autoplayController: AutoplayController?
+    /// Music brain stage 5 (docs/brain-spec.md, 3.3): tempo and loudness measured from the song that plays (Developer mode's
+    /// "Tempo and loudness" row reads its status). Nil in UI tests.
+    let audioMeasurer: AudioMeasurer?
     /// What the listener does to the music brain by hand (docs/brain-spec.md, 8.3, 8.5): "Start station", "Not for
     /// me" and its bar, the Familiar / Blend / Discover switch, a Home row's card.
     let brainActions: BrainActions
@@ -347,8 +350,17 @@ final class AppEnvironment {
             // picks at once (docs/brain-spec.md, 8.5). Nothing runs until a change is made.
             autoplay.observeTasteChanges { tasteAdjustments.revision }
             autoplayController = autoplay
+            // Stage 5: a window of the song that plays and of the next one is decoded on a background task, 10 s in.
+            let resolver = realPlayback.engine.factory.resolver
+            let measurer = AudioMeasurer(brain: brain, sources: AudioMeasurer.Sources(
+                isOn: { aiSettings.brainEngine == BrainEngineChoice.brain },
+                inLibrary: { libraryStore.song(id: $0) != nil },
+                playableURL: { song in await resolver.playableURL(for: song) }))
+            realPlayback.audioMeasurer = measurer
+            audioMeasurer = measurer
         } else {
             autoplayController = nil
+            audioMeasurer = nil
         }
         brainActions = BrainActions(brain: brain, playback: playback, library: library, taste: tasteAdjustments,
                                     playCounts: playCounts, engine: realPlayback?.engine, autoplay: autoplayController)

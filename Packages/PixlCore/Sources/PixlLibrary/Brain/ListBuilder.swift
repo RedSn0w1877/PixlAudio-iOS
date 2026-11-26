@@ -3,7 +3,7 @@
 // transliteration of the Android `:brain` module's `ListBuilder.kt`.
 //
 // Stage 1 has the hard constraints of 6.4, the slot plan and `lambda`; stage 2a adds the served-log penalty
-// (`Scored.servedPen`); no calibration or flow cost yet. Ordering is by a quantised key with a total tie-break, so sort stability and floating-point noise below
+// (`Scored.servedPen`); stage 2b the calibration; stage 5 the flow cost (`Flow`). Ordering is by a quantised key with a total tie-break, so sort stability and floating-point noise below
 // 2^-20 cannot change a list.
 
 /// The list builder.
@@ -115,13 +115,17 @@ public enum ListBuilder {
         /// Stage 3 (5.10): the arm bandit. A novel slot goes to the arm with the largest draw among the arms that still have a
         /// candidate, and the pick is flagged `Pick.explore`. Nil keeps stage 2's choice (the best-valued novel candidate), exactly.
         public var armPicker: (any ArmPicker)?
+        /// Stage 5: tempo, loudness and energy of the candidates, for the flow cost of 6.5 (`Flow`). Nil keeps stage 4's value,
+        /// exactly (every earlier golden list is unchanged).
+        public var flow: Flow.Context?
 
         public init(count: Int, prior: [Prior], nu: Double, tieSeed: Int64, nowMs: Int64, tzOffsetMin: Int32,
                     firstSlotAids: [Int64]? = nil, likedAid: Int64 = 0, likedRid: Int64 = 0, finite: Bool = false,
                     thinAid: Int64 = 0, lambda: Double = ListBuilder.lambdaDefault,
                     calibration: Calibration? = nil, kappa: Double = Calibration.kappa,
                     simSource: (any SimilaritySource)? = nil, maxPerArtist: Int = 0, minNewArtistShare: Double = 0.0,
-                    armPicker: (any ArmPicker)? = nil) {
+                    armPicker: (any ArmPicker)? = nil, flow: Flow.Context? = nil) {
+            self.flow = flow
             self.count = count
             self.prior = prior
             self.nu = nu
@@ -243,7 +247,7 @@ public enum ListBuilder {
                         if s.c.aid != request.likedAid || used.contains(s.c.rid) || !okSlot(s.c) {
                             continue
                         }
-                        let key = BrainMath.orderKey(value(s, list, graph, request))
+                        let key = BrainMath.orderKey(value(s, list, graph, request, i))
                         if best == nil || better(key, s.c.rid, bestKey, best!.c.rid, request.tieSeed) {
                             best = s
                             bestKey = key
@@ -331,7 +335,7 @@ public enum ListBuilder {
                             }
                             if restrict && !s.c.artistNew { continue }
                             if drawnArm >= 0 && s.arm != drawnArm { continue }
-                            let key = BrainMath.orderKey(value(s, list, graph, request))
+                            let key = BrainMath.orderKey(value(s, list, graph, request, i))
                             if chosen == nil || better(key, s.c.rid, chosenKey, chosen!.c.rid, request.tieSeed) {
                                 chosen = s
                                 chosenKey = key
@@ -357,8 +361,16 @@ public enum ListBuilder {
         return picks
     }
 
-    /// `lambda * z - (1 - lambda) * max over the last slots j of sim(i, j)`.
-    private static func value(_ s: Scored, _ list: [Prior], _ graph: Graph, _ request: Request) -> Double {
+    /// `lambda * z - (1 - lambda) * max over the last slots j of sim(i, j) + kappa * calibGain - servedPen + noise`, and from stage 5
+    /// `- flowCost` when the request has a `Request.flow` (`Flow.cost`; slot `slot` of `Request.count`).
+    private static func value(_ s: Scored, _ list: [Prior], _ graph: Graph, _ request: Request, _ slot: Int) -> Double {
+        let base = valueWithoutFlow(s, list, graph, request)
+        guard let flow = request.flow else { return base }
+        let prev = list.isEmpty ? flow.lead : flow.of(list[list.count - 1].rid)
+        return base - Flow.cost(flow, prev, flow.of(s.c.rid), slot, request.count)
+    }
+
+    private static func valueWithoutFlow(_ s: Scored, _ list: [Prior], _ graph: Graph, _ request: Request) -> Double {
         var maxSim = 0.0
         var back = 1
         let source = request.simSource

@@ -105,10 +105,14 @@ public struct DnaEnricher: Sendable {
     private let atlasProvider: any AtlasProvider
     private let clock: @Sendable () -> Int64
     private let timing: @Sendable (String, Int64) -> Void
+    /// Stage 5: tempo and loudness measured on the phone (`audio_measure`); nil for none.
+    private let measures: (any AudioMeasureLookup)?
 
     public init(http: any KnowledgeHttp, store: DnaRepository, atlas: any AtlasProvider,
                 clock: @escaping @Sendable () -> Int64 = { currentTimeMillis() },
-                timing: @escaping @Sendable (String, Int64) -> Void = { _, _ in }) {
+                timing: @escaping @Sendable (String, Int64) -> Void = { _, _ in },
+                measures: (any AudioMeasureLookup)? = nil) {
+        self.measures = measures
         deezer = DeezerSource(http: http)
         musicBrainz = MusicBrainzSource(http: http)
         listenBrainz = ListenBrainzSource(http: http)
@@ -382,8 +386,9 @@ public struct DnaEnricher: Sendable {
             || !(t.spotifyReleaseDate.map(BrainText.isBlank) ?? true)
         if st.tried == 0 && !ownFacts && st.prior == nil { return false }
         let now = clock()
+        let measured = await measures?.measured(t.rid)
         let r = DnaAssembler.assemble(target: t, evidence: st.evidence(), prior: st.prior, priorArtist: st.priorArtist, atlas: atlas,
-                                      atlasVersion: version, nowMs: now, maxYear: Self.currentYear(now) + 1)
+                                      atlasVersion: version, nowMs: now, maxYear: Self.currentYear(now) + 1, measured: measured)
         return await store.upsert(track: r.track, artist: r.artist)
     }
 

@@ -114,6 +114,8 @@ final class DualDeckEngine: PlaybackEngine {
     /// Spatial audio's own hook (`SpatialPlaybackController`): the current item changed (a new song, or another
     /// rendition of the same one), or the active deck's play state did (its tap has been prepared by then).
     var onSpatialItemChanged: (() -> Void)?
+    /// Loading, or waiting for data while it should play (a stall): the music brain's audio measurer pauses meanwhile (stage 5).
+    var onPreparingChanged: ((Bool) -> Void)?
 
     init(session: AudioSessionController, effects: AudioEffectsParameters, factory: DeckItemFactory) {
         (events, continuation) = AsyncStream.makeStream(of: PlaybackEngineEvent.self)
@@ -933,6 +935,7 @@ final class DualDeckEngine: PlaybackEngine {
         guard preparing != isPreparing else { return }
         isPreparing = preparing
         emit(.preparingChanged(preparing))
+        onPreparingChanged?(preparing)
     }
 }
 

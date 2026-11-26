@@ -277,7 +277,8 @@ public enum DnaAssembler {
     /// Builds the stored rows. `prior` and `priorArtist` are what is on disk (nil on a first run); `nowMs` stamps the
     /// parts that were refreshed; `maxYear` is the current year plus one.
     public static func assemble(target: DnaTarget, evidence: DnaEvidence, prior: TrackDnaRow?, priorArtist: ArtistDnaRow?,
-                                atlas: GenreAtlas, atlasVersion: Int, nowMs: Int64, maxYear: Int) -> Result {
+                                atlas: GenreAtlas, atlasVersion: Int, nowMs: Int64, maxYear: Int,
+                                measured: AudioFeatures.Result? = nil) -> Result {
         var tried = evidence.tried
         if !target.spotifyGenres.isEmpty, !target.spotifyOff { tried |= DnaSource.spotifyGenres }
         if !target.chipGenres.isEmpty { tried |= DnaSource.youtubeChips }
@@ -332,15 +333,21 @@ public enum DnaAssembler {
         if lbPop >= 0 { popParts.append("l:\(lbPop)") }
         let popRefreshed = evidence.deezerTrack != nil || evidence.lbPopularity != nil || target.ytPlays > 0
 
-        // Tempo and loudness: Deezer, when it has them.
+        // Tempo and loudness (3.3, stage 5): a trusted on-device measurement (`measured`), then Deezer, then a weak measurement;
+        // Deezer's gain, then the measured loudness. A tempo another source left in the row (AcousticBrainz) stays while nothing
+        // better is known.
         var bpm: Int?
         if let b = evidence.deezerTrack?.bpm, b > 0.0 { bpm = Int(b * 10.0 + 0.5) }
-        let tempo = bpm ?? prior?.tempoBpmX10 ?? 0
-        let tempoSource = bpm != nil ? 1 : (prior?.tempoSource ?? 0)
-        let gain: Int
-        if let g = evidence.deezerTrack?.gain { gain = Int(BrainMath.floorToLong(g * 10.0 + 0.5)) } else { gain = prior?.gainDbX10 ?? TrackDna.gainUnknown }
+        let deezerBpm = bpm ?? ((prior?.tempoSource == TrackDna.tempoDeezer) ? (prior?.tempoBpmX10 ?? 0) : 0)
+        let chosen = AudioFeatures.chooseTempo(deezerBpm, measured)
+        let keptOther: TrackDnaRow? = (prior?.tempoSource == TrackDna.tempoAcousticBrainz && (prior?.tempoBpmX10 ?? 0) > 0) ? prior : nil
+        let tempo = chosen.source != TrackDna.tempoUnknown ? chosen.bpmX10 : (keptOther?.tempoBpmX10 ?? 0)
+        let tempoSource = chosen.source != TrackDna.tempoUnknown ? chosen.source : (keptOther?.tempoSource ?? TrackDna.tempoUnknown)
+        let deezerGain: Int
+        if let g = evidence.deezerTrack?.gain { deezerGain = Int(BrainMath.floorToLong(g * 10.0 + 0.5)) } else { deezerGain = prior?.gainDbX10 ?? TrackDna.gainUnknown }
+        let gain = AudioFeatures.chooseGain(deezerGain, measured).gainDbX10
 
-        let feel = TrackDna.feel(atlas, tags, gainDbX10: gain)
+        let feel = TrackDna.feel(atlas, tags, gainDbX10: gain, tempoBpmX10: tempo)
         let moods = TrackDna.moods(atlas, tags)
         let flags = Int(BrainText.cleanTitle(target.title).versionFlags)
 

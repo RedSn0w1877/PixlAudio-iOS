@@ -216,6 +216,8 @@ extension BrainMixes {
             regenerate: regen, excludedRids: ignored, servedTimes: [:], edges: edges, count: query.count,
             embeddings: known.embeddings, tagsByRid: known.tags)
         request.nuOverride = AssistantRules.noveltyShare(query, base: MixPlanner.nu0 * Novelty.factor(level))
+        // Stage 5: the mix steps smoothly in tempo, loudness and energy (6.5).
+        request.flowFacts = known.flowFacts
         let plan = await engine.planMix(request)
 
         var out: [AssistantPickData] = []

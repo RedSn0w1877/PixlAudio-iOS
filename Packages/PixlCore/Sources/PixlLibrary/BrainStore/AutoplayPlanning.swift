@@ -116,8 +116,21 @@ public enum AutoplayPlanning {
             batch: batch,
             station: station,
             closestOfSeeds: station.map { $0.seedMediaIds.count > 1 || stationReseeded } ?? false,
-            replaceAll: refreshing)
+            replaceAll: refreshing,
+            leadRid: leadRid(queue: queue, tailStart: tailStart, served: served, pool: pool))
         return AutoplayPlanContext(inputs: inputs, entriesByRid: entriesByRid)
+    }
+
+    /// Stage 5: the recording the list follows (the queue item just before the planned slots), for the first slot's flow cost; 0
+    /// when unknown.
+    public static func leadRid(queue: [AutoplayQueueItem], tailStart: Int, served: [BrainKey: AutoplayPoolEntry],
+                               pool: [AutoplayPoolEntry]) -> Int64 {
+        let index = tailStart - 1
+        guard index >= 0, index < queue.count else { return 0 }
+        let key = BrainKey(queue[index].mediaId)
+        if let entry = served[key] { return entry.brain?.rid ?? 0 }
+        for entry in pool where BrainKey(entry.candidate.mediaId) == key { return entry.brain?.rid ?? 0 }
+        return 0
     }
 
     /// The queue tag of one engine pick. `pick` nil is a pick in pool order (the library-only pool). A station's

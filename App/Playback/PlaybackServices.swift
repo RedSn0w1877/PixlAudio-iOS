@@ -31,6 +31,9 @@ final class PlaybackServices {
     /// Autoplay (docs/brain-spec.md, 7.1): told about track changes, queue changes, play state and the end of the
     /// queue, next to the hooks above (which the prefetcher owns and which stay as they are).
     var autoplay: AutoplayController?
+    /// Music brain stage 5 (docs/brain-spec.md, 3.3): measures tempo and loudness of the song that plays and the next one.
+    /// Told about track changes and stalls only.
+    var audioMeasurer: AudioMeasurer?
     /// The music brain's side of a play (docs/brain-spec.md, 4.2). `AppEnvironment` sets both: whether the library
     /// has a row for a song id, and whether Autoplay brought the id from outside the library.
     var isInLibrary: ((String) -> Bool)?
@@ -151,6 +154,12 @@ final class PlaybackServices {
             self.snapshots.scheduleSave()
             self.onUpcomingChanged?()
             self.autoplay?.itemTransition()
+            self.audioMeasurer?.onTrackChanged(self.measureTargets())
+        }
+        // Stage 5: the audio measurement never competes with a stall of the listener's playback.
+        engine.onPreparingChanged = { [weak self] preparing in
+            guard let self else { return }
+            self.audioMeasurer?.onStall(preparing && self.engine.playWhenReady)
         }
         engine.onRepeatLoop = { [weak self] in
             guard let self else { return }
@@ -242,6 +251,17 @@ final class PlaybackServices {
                 await self?.engagementRecorded()
             }
         }
+    }
+
+    /// The song that plays and the next one the queue will play on its own (stage 5's measurer).
+    private func measureTargets() -> [Song] {
+        guard let current = engine.queue.current else { return [] }
+        var out = [current.song]
+        if let next = engine.queue.nextIndexForAutoAdvance, next != engine.queue.currentIndex,
+           let entry = engine.queue.entry(at: next) {
+            out.append(entry.song)
+        }
+        return out
     }
 
     // MARK: The music brain's play (docs/brain-spec.md, 4.2)

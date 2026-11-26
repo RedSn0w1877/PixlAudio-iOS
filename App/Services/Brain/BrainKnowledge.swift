@@ -100,11 +100,15 @@ nonisolated final class BrainKnowledge: Sendable {
     let ledger: KnowledgeLedger
     let lanes: DnaLanes
     let reader: BrainDataReader
+    /// Stage 5: tempo and loudness measured on the phone (`audio_measure.pbl`), read by the DNA assembly and the flow ordering.
+    let measures: AudioMeasureRepository
 
     init(directory: URL, engine: BrainEngine, sources: DnaSources, repository: BrainRepository,
          youTubeToday: @escaping @Sendable () async -> Int, spotifyArtists: @escaping @Sendable () async -> (total: Int, withGenres: Int),
          timing: @escaping @Sendable (String, Int64) -> Void) {
         let dna = DnaRepository(directory: directory)
+        let measures = AudioMeasureRepository(directory: directory, dna: dna)
+        self.measures = measures
         let atlas = CachedAtlasProvider { GenreAtlasAsset.load() }
         let ledger = KnowledgeLedger(store: BrainStateValueStore(engine: engine))
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
@@ -113,7 +117,7 @@ nonisolated final class BrainKnowledge: Sendable {
         self.atlas = atlas
         self.ledger = ledger
         lanes = DnaLanes(targets: DnaTargets(sources: sources, repository: repository, engine: engine, store: dna),
-                         enricher: DnaEnricher(http: http, store: dna, atlas: atlas, timing: timing),
+                         enricher: DnaEnricher(http: http, store: dna, atlas: atlas, timing: timing, measures: measures),
                          purge: SpotifyDnaPurge(shapesPicks: sources.spotifyShapesPicks, store: dna, atlas: atlas,
                                                 state: StateValues.of(engine)))
         reader = BrainDataReader(

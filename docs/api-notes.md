@@ -1090,3 +1090,9 @@ Launch, library, artwork, player and Spotify-matcher speed-ups (docs/performance
 | `View.sensoryFeedback(trigger:_:)` with an optional feedback | 17 | /documentation/swiftui/view/sensoryfeedback(trigger:_:) | `SongTapView` | The cue (tick, confirm, success, warn) picks the feedback; nil while Haptic feedback is off. |
 | `SensoryFeedback.selection`, `.impact(weight:)`, `.success`, `.warning` | 17 | /documentation/swiftui/sensoryfeedback | `SongTapView` | tick = selection, confirm = light impact, success = success, warn = warning. |
 | `UIApplication.openSettingsURLString` | 8 | /documentation/uikit/uiapplication/opensettingsurlstring | `SongTapView` | "Open Settings" when the camera is off for the app. |
+
+## Music brain stage 5: audio measurer (2026-11-25, branch `brain-stage5`)
+| API | Min iOS | Docs | Used in | Notes |
+|---|---|---|---|---|
+| `AVAssetReaderTrackOutput(track:outputSettings:)` with 16-bit interleaved LPCM (`AVLinearPCMBitDepthKey` 16, not float, little-endian), `alwaysCopiesSampleData`, `AVAssetReader.timeRange` | 4.1 | /documentation/avfoundation/avassetreadertrackoutput | `AudioMeasurer` | 42 s from 20% into the song at its native rate and channel count; on a `pixlstream://` asset the registered resource loader serves the bytes. |
+| `CMSampleBufferGetFormatDescription`, `CMAudioFormatDescriptionGetStreamBasicDescription`, `CMBlockBufferGetDataLength`, `CMBlockBufferCopyDataBytes` | 4 | /documentation/coremedia/cmblockbuffercopydatabytes(_:atoffset:datalength:destination:) | `AudioMeasurer` | Sample rate and channels from the first buffer; samples copied into one reused array. |

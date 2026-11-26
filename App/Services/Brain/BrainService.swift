@@ -186,12 +186,35 @@ final class BrainService {
     /// Everything Settings › Developer mode › Brain data shows, read now (off the main actor). Nil when the brain is off.
     func brainDataReport() async -> BrainDataReport? { await knowledge?.reader.read() }
 
+    // MARK: Stage 5: tempo and loudness measured on the phone (docs/brain-spec.md, 3.3, 6.5)
+
+    /// The measurements (`audio_measure.pbl`); nil before `configureKnowledge` and in UI tests.
+    var audioMeasures: AudioMeasureRepository? { knowledge?.measures }
+
+    /// `inputs` with the flow facts of its pool, its prior tail and its lead (6.5): read before the plan, off the main actor. Without
+    /// measurements or DNA the inputs come back as they are and the plan is what it was before stage 5.
+    nonisolated static func withFlowFacts(_ inputs: AutoplayPlanInputs, from source: AudioMeasureRepository?) async -> AutoplayPlanInputs {
+        guard let source else { return inputs }
+        var out = inputs
+        out.flowFacts = await source.flowFacts(inputs.flowRids)
+        return out
+    }
+
+    /// The recording id of a song for the measurer (the same keys a play of it is recorded under); 0 when it has none.
+    func recordingId(of song: Song, inLibrary: Bool) async -> Int64 {
+        guard let repository else { return 0 }
+        let context = PlayContext.of(song: song, inLibrary: inLibrary, videoId: TrackCatalog.videoId(ofSongId: song.id), tag: nil,
+                                     startReason: StartReason.unknown, shuffle: false, repeatOne: false)
+        guard let facts = TrackCatalog.facts(of: context, durationMs: song.duration) else { return 0 }
+        return await repository.resolveTrack(facts.keys, durationMs: Int32(clamping: max(song.duration, 0)))
+    }
+
     /// Builds the objects behind the mixes and the refresh. Reads nothing, fetches nothing: `sources` are closures.
     func configureMixes(sources: MixSources, budget: HostBudget?) {
         guard let directory, let repository, let engine else { return }
         let kit = Stage2bKit.make(directory: directory, engine: engine, repository: repository, sources: sources,
                                   dna: knowledge?.dna, atlas: knowledge?.atlas ?? CachedAtlasProvider(load: { nil }),
-                                  newReleases: newReleases)
+                                  newReleases: newReleases, flow: knowledge?.measures)
         stage2b = kit
         let mixes = BrainMixes(directory: directory, repository: repository, engine: engine, sources: sources, parts: kit.parts)
         self.mixes = mixes

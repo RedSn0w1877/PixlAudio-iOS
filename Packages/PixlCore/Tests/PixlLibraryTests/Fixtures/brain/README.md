@@ -181,3 +181,13 @@ How each `fn` is replayed:
   (0 speak, 1 wait, 2 skip), `reason` and `waitMs`. `cancel`: `HostVoice.cancelReason(Running)`. `ramp`: `HostVoice.ramp(from, to, elapsedMs, rampMs)` in
   thousandths. `line`: `HostVoice.line(text)` (Unicode characters are compared as UTF-16 units; a space-only difference is not allowed).
   `estimate`: `HostVoice.estimateMs(line)`.
+## Stage 5 (`audiofeatures.jsonl`, `flow.jsonl`)
+
+`estimate`: render the fixture with `AudioFixtures.render` (test source; port it operation by operation: SplitMix64 noise, Taylor
+  `sinT` / `cosT` to x^21, the two-term sine recurrence, `x * 32767` rounded half up and clipped), check `pcmHash` (FNV-1a 64 of
+  the samples as 16-bit little-endian bytes) and `samples`, then feed `AudioFeatures.Estimator(sampleRate, channels)` in blocks of
+  `block` frames and compare every field of the result. `tanSmall`, `windowStartMs`, `choose` (`chooseTempo` + `chooseGain`) are
+  the small helpers. `flow.jsonl`: `tempoDist`, `step`, `arc` (`Flow.target` and `Flow.arc`), `feelTempo` (`TrackDna.feel` with
+  the tempo nudge, on the bundled atlas), and `build`: a `ListBuilder.build` of the pool (`Candidate(rid, aid, inLibrary = !novel)`,
+  arm RADIO, `bestRank 0`, `bestSeed -1`, `newestSeedRank 0`, `lastMs 0`, `retrQ 500`) on an empty graph, without and then with a
+  `Flow.Context(facts, lead, arc = finite)`; `roughness` is `Flow.roughness` of the picked order.
