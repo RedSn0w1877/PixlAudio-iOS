@@ -49,8 +49,8 @@ final class AudioMeasurer {
 
     static let maxTargets = 2
     static let settleMs: Int64 = 10_000
-    static let deadlineMs: Int64 = 60_000
-    static let stallGiveUpMs: Int64 = 8_000
+    nonisolated static let deadlineMs: Int64 = 60_000
+    nonisolated static let stallGiveUpMs: Int64 = 8_000
 
     private(set) var status: Status?
 
