@@ -115,8 +115,10 @@ struct BrainEvalTests {
         return Eval.listHealth(world, start: start, days: 30, nowMs: listener.nowMs + 3_600_000, nuMultiplier: multiplier)
     }
 
-    // Android's measured test 5 (its handoff): distinct-track ratio over 30 days, largest artist share, novelty gap.
-    static let distinct: [Double] = [0.668, 0.837, 0.713]
+    // Test 5's distinct-track ratio over 30 days (loyal, explorer, repeater). Was Android's measured [0.668, 0.837, 0.713];
+    // re-pinned 2026-11-26 for two lanes (the familiar lane ordered by the choice score), the mixes being bit-identical to
+    // Android's regenerated golden files.
+    static let distinct: [Double] = [0.6122, 0.830, 0.740]
 
     /// One test per listener: each is 60 mix builds over a pool of three thousand tracks, which takes a while in a
     /// debug build, and separate tests run in parallel.

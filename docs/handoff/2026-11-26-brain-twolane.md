@@ -15,6 +15,11 @@ spec 5.7 "Two lanes" and 6.5 "lanes"). Branch `brain-twolane`.
 - Goldens copied from Android at `82237d9`: `lists`, `mixes`, `session`, `stage2a`, `eval` + `MANIFEST.sha256` (only those five hashes moved).
 - `docs/brain-spec.md`: the two paragraphs of 5.7 and 6.5 copied word for word.
 
+- `BrainEvalTests.distinct` (test 5, distinct-track ratio over 30 days) re-pinned: loyal 0.668 -> 0.612, explorer 0.837 -> 0.830,
+  repeater 0.713 -> 0.740. Android's `EvalTest` only asserts `>= 0.60`, so it has no pin to copy; the mixes behind it are proven
+  bit-identical by the regenerated goldens. Loyal now sits close to the 0.60 floor: worth a look on Android (`EvalTest` prints it).
+- Local run: `ci\swiftw.cmd test --filter PixlLibraryTests.Brain`, 608 tests, all pass after the re-pin.
+
 ## Not ported
 
 - Android's `tools/eval` `compose` command (Kotlin-only research tool; iOS has no eval tool).
